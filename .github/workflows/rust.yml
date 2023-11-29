@@ -31,6 +31,18 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Check formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check
+
+      - name: Lint with clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all-targets --all-features -- -D warnings
+
       - name: Build
         uses: actions-rs/cargo@v1
         with:
