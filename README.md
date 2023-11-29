@@ -59,7 +59,7 @@ To set the device mode:
 To show a solid color using the real-time functionality:
 
 ```bash
-./glow_control device-call --ip <DEVICE_IP> --mac <DEVICE_MAC> rt-effect show-color --color <COLOR_NAME>
+./glow_control device-call --ip <DEVICE_IP> --mac <DEVICE_MAC> rt-effect show-color <COLOR_NAME>
 ```
 
 ### Shine Effect
