@@ -11,7 +11,7 @@ use std::path::Path;
 use std::str::FromStr;
 use serde_json::json;
 use chrono::{NaiveTime, Timelike};
-use clap::{ArgEnum, ValueEnum};
+use clap::{ArgEnum};
 use serde::{Deserialize, Deserializer, Serialize};
 use palette::{FromColor, Hsl, IntoColor, Srgb};
 use rand::prelude::{IteratorRandom, SliceRandom};

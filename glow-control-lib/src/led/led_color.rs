@@ -22,14 +22,14 @@ pub struct ColorModel {
 }
 
 impl ColorModel {
-    fn new() -> Self {
+    pub fn new() -> Self {
         ColorModel {
             color_style: ColorStyle::Col8,
             lightness_policy: LightnessPolicy::Equilight,
         }
     }
 
-    fn set_color_style(&mut self, style: &str) -> Result<()> {
+    pub fn set_color_style(&mut self, style: &str) -> Result<()> {
         match style {
             "3col" => self.color_style = ColorStyle::Col3,
             "4col" => self.color_style = ColorStyle::Col4,
@@ -43,7 +43,7 @@ impl ColorModel {
         Ok(())
     }
 
-    fn get_color_style(&self) -> (ColorStyle, LightnessPolicy) {
+    pub fn get_color_style(&self) -> (ColorStyle, LightnessPolicy) {
         (self.color_style, self.lightness_policy)
     }
 }
