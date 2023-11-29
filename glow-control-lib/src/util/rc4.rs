@@ -1,4 +1,3 @@
-
 pub struct Rc4 {
     i: u8,
     j: u8,
@@ -30,7 +29,8 @@ impl Rc4 {
 
             self.s.swap(self.i as usize, self.j as usize);
 
-            let k = self.s[(self.s[self.i as usize].wrapping_add(self.s[self.j as usize])) as usize];
+            let k =
+                self.s[(self.s[self.i as usize].wrapping_add(self.s[self.j as usize])) as usize];
             *byte ^= k;
         }
     }

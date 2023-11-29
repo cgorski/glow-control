@@ -1,3 +1,3 @@
+pub mod control_interface;
 pub mod led;
 pub mod util;
-pub mod control_interface;

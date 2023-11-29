@@ -1,21 +1,21 @@
-use std::collections::HashSet;
-use std::fmt;
-use reqwest::{Client, StatusCode};
-use std::time::Duration;
-use tokio::net::UdpSocket;
-use tokio::time::{Instant, interval, sleep};
+use anyhow::{anyhow, Context};
 use base64::decode;
 use bytes::{BufMut, BytesMut};
-use anyhow::{anyhow, Context};
-use std::path::Path;
-use std::str::FromStr;
-use serde_json::json;
 use chrono::{NaiveTime, Timelike};
-use clap::{ArgEnum};
-use serde::{Deserialize, Deserializer, Serialize};
+use clap::ArgEnum;
 use palette::{FromColor, Hsl, IntoColor, Srgb};
 use rand::prelude::{IteratorRandom, SliceRandom};
-use rand::{thread_rng};
+use rand::thread_rng;
+use reqwest::{Client, StatusCode};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::json;
+use std::collections::HashSet;
+use std::fmt;
+use std::path::Path;
+use std::str::FromStr;
+use std::time::Duration;
+use tokio::net::UdpSocket;
+use tokio::time::{interval, sleep, Instant};
 
 use crate::util::auth::Auth;
 use crate::util::movie::Movie;
@@ -116,7 +116,10 @@ impl ControlInterface {
 
         // Validate num_start_simultaneous
         if num_start_simultaneous == 0 || num_start_simultaneous > num_leds {
-            return Err(anyhow!("num_start_simultaneous must be between 1 and {}", num_leds));
+            return Err(anyhow!(
+                "num_start_simultaneous must be between 1 and {}",
+                num_leds
+            ));
         }
 
         // Validate colors is not empty
@@ -125,8 +128,16 @@ impl ControlInterface {
         }
 
         let mut leds = vec![(0, 0, 0); num_leds];
-        let mut glow_start_times = vec![Instant::now() - (time_to_max_glow + time_to_fade) * 2; num_leds];
-        let mut led_colors = vec![RGB { red: 0, green: 0, blue: 0 }; num_leds]; // Track color for each LED
+        let mut glow_start_times =
+            vec![Instant::now() - (time_to_max_glow + time_to_fade) * 2; num_leds];
+        let mut led_colors = vec![
+            RGB {
+                red: 0,
+                green: 0,
+                blue: 0
+            };
+            num_leds
+        ]; // Track color for each LED
 
         let frame_duration = Duration::from_secs_f64(1.0 / frame_rate);
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
@@ -144,7 +155,9 @@ impl ControlInterface {
             if time_since_last_glow >= time_between_glow_start {
                 let mut rng = thread_rng();
                 let mut available_leds: Vec<usize> = (0..num_leds)
-                    .filter(|&i| now.duration_since(glow_start_times[i]) >= time_to_max_glow + time_to_fade)
+                    .filter(|&i| {
+                        now.duration_since(glow_start_times[i]) >= time_to_max_glow + time_to_fade
+                    })
                     .collect();
 
                 // Shuffle the available LEDs to randomize the selection
@@ -153,7 +166,10 @@ impl ControlInterface {
                 for &led_index in available_leds.iter().take(num_start_simultaneous) {
                     glow_start_times[led_index] = now;
                     // Randomly select a color for the LED
-                    led_colors[led_index] = *colors.iter().choose(&mut rng).expect("colors set is not empty");
+                    led_colors[led_index] = *colors
+                        .iter()
+                        .choose(&mut rng)
+                        .expect("colors set is not empty");
                 }
 
                 time_since_last_glow = Duration::from_secs(0);
@@ -185,7 +201,8 @@ impl ControlInterface {
 
             // Send the updated frame to the device
             let flattened_frame = ControlInterface::flatten_rgb_vec(leds.clone());
-            self.set_rt_frame_socket(&socket, &flattened_frame, 3).await?;
+            self.set_rt_frame_socket(&socket, &flattened_frame, 3)
+                .await?;
         }
     }
 
@@ -196,23 +213,30 @@ impl ControlInterface {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.connect((self.host.as_str(), 7777)).await?;
         loop {
-            self.set_rt_frame_socket(&socket, &flattened_frame, 3).await?;
+            self.set_rt_frame_socket(&socket, &flattened_frame, 3)
+                .await?;
             sleep(Duration::from_millis(100)).await;
         }
     }
 
-    pub async fn show_real_time_test_color_wheel(&self,  step : f64, frame_rate: f64) -> anyhow::Result<()> {
+    pub async fn show_real_time_test_color_wheel(
+        &self,
+        step: f64,
+        frame_rate: f64,
+    ) -> anyhow::Result<()> {
         let interval = Duration::from_secs_f64(1.0 / frame_rate);
         let mut offset = 0_f64;
         self.set_mode(DeviceMode::RealTime).await?;
         let layout = self.fetch_layout().await?;
         loop {
-         //   let gradient_frame = generate_color_wheel_gradient(self.device_info.number_of_led, offset);
-            let gradient_frame = generate_color_gradient_along_axis(&layout.coordinates, Axis::Z, offset);
+            //   let gradient_frame = generate_color_wheel_gradient(self.device_info.number_of_led, offset);
+            let gradient_frame =
+                generate_color_gradient_along_axis(&layout.coordinates, Axis::Z, offset);
             let gradient_frame = ControlInterface::flatten_rgb_vec(gradient_frame);
             let socket = UdpSocket::bind("0.0.0.0:0").await?;
             socket.connect((self.host.as_str(), 7777)).await?;
-            self.set_rt_frame_socket(&socket, &gradient_frame, 3).await?;
+            self.set_rt_frame_socket(&socket, &gradient_frame, 3)
+                .await?;
 
             // Increment the offset for the next frame
             offset = (offset + step) % 1.0;
@@ -225,17 +249,22 @@ impl ControlInterface {
     }
 
     pub fn flatten_rgb_vec(rgb_vec: Vec<(u8, u8, u8)>) -> Vec<u8> {
-        rgb_vec.into_iter().flat_map(|(r, g, b)| vec![r, g, b]).collect()
+        rgb_vec
+            .into_iter()
+            .flat_map(|(r, g, b)| vec![r, g, b])
+            .collect()
     }
-    pub async fn set_rt_frame_socket(&self, socket : &UdpSocket,  frame: &[u8], version : u32) -> anyhow::Result<()> {
-
-
+    pub async fn set_rt_frame_socket(
+        &self,
+        socket: &UdpSocket,
+        frame: &[u8],
+        version: u32,
+    ) -> anyhow::Result<()> {
         // Determine the protocol version from the device configuration
         // let version = self.device_info.fw_version; // Assuming fw_version is a field in DeviceInfoResponse
 
         // Decode the access token
-        let access_token = decode(&self.auth_token)
-            .context("Failed to decode access token")?;
+        let access_token = decode(&self.auth_token).context("Failed to decode access token")?;
 
         // Prepare the packet based on the protocol version
         let mut packet = BytesMut::new();
@@ -245,13 +274,13 @@ impl ControlInterface {
                 packet.extend_from_slice(&access_token);
                 packet.put_u8(self.device_info.number_of_led as u8); // Number of LEDs
                 packet.extend_from_slice(frame);
-            },
+            }
             2 => {
                 packet.put_u8(2); // Protocol version 2
                 packet.extend_from_slice(&access_token);
                 packet.put_u8(0); // Placeholder byte
                 packet.extend_from_slice(frame);
-            },
+            }
             _ => {
                 // Protocol version 3 or higher
                 let packet_size = 900;
@@ -274,7 +303,6 @@ impl ControlInterface {
         Ok(())
     }
     pub async fn show_rt_frame(&self, frame: &[u8]) -> anyhow::Result<()> {
-
         // Fetch the current mode from the device
         let mode_response = self.get_mode().await?;
         let current_mode = mode_response;
@@ -295,7 +323,11 @@ impl ControlInterface {
     pub fn get_device_info(&self) -> &DeviceInfoResponse {
         &self.device_info
     }
-    async fn fetch_device_info(client: &Client, host: &str, auth_token: &str) -> anyhow::Result<DeviceInfoResponse> {
+    async fn fetch_device_info(
+        client: &Client,
+        host: &str,
+        auth_token: &str,
+    ) -> anyhow::Result<DeviceInfoResponse> {
         let url = format!("http://{}/xled/v1/gestalt", host);
         let response = client
             .get(&url)
@@ -305,11 +337,14 @@ impl ControlInterface {
             .map_err(|e| anyhow!("Failed to fetch layout: {}", e))?;
 
         if response.status() != reqwest::StatusCode::OK {
-            return Err(anyhow!("Failed to fetch device info with status: {}", response.status()));
+            return Err(anyhow!(
+                "Failed to fetch device info with status: {}",
+                response.status()
+            ));
         }
         let response = response.text().await?;
         println!("Response: {}", response);
-        let device_info : DeviceInfoResponse= serde_json::from_str(&response)?;
+        let device_info: DeviceInfoResponse = serde_json::from_str(&response)?;
         // let device_info = response
         //     .json::<DeviceInfoResponse>()
         //     .await
@@ -350,7 +385,8 @@ impl ControlInterface {
 
         // Upload the movie to the device
         let url = format!("http://{}/xled/v1/led/movie/full", self.host);
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("X-Auth-Token", &self.auth_token)
             .body(movie_data)
@@ -366,11 +402,13 @@ impl ControlInterface {
                 } else {
                     Err(anyhow!("Failed to get movie ID from response"))
                 }
-            },
-            _ => Err(anyhow!("Failed to upload movie with status: {}", response.status())),
+            }
+            _ => Err(anyhow!(
+                "Failed to upload movie with status: {}",
+                response.status()
+            )),
         }
     }
-
 
     /// Turns on the device by setting it to the last known mode or a default mode.
     pub async fn turn_on(&self) -> anyhow::Result<()> {
@@ -379,7 +417,7 @@ impl ControlInterface {
         let current_mode = mode_response;
 
         // If the device is already on, we don't need to change the mode
-        if current_mode !=DeviceMode::Off {
+        if current_mode != DeviceMode::Off {
             return Ok(());
         }
 
@@ -396,10 +434,9 @@ impl ControlInterface {
 
     /// Helper method to set the device mode.
     pub async fn set_mode(&self, mode: DeviceMode) -> anyhow::Result<()> {
-
-
         let url = format!("http://{}/xled/v1/led/mode", self.host);
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("X-Auth-Token", &self.auth_token)
             .json(&json!({ "mode": mode.to_string() }))
@@ -410,7 +447,10 @@ impl ControlInterface {
         if response.status() == StatusCode::OK {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Failed to set mode with status: {}", response.status()))
+            Err(anyhow::anyhow!(
+                "Failed to set mode with status: {}",
+                response.status()
+            ))
         }
     }
 
@@ -425,14 +465,21 @@ impl ControlInterface {
         let response = Auth::make_challenge_response(&challenge, hw_address)?;
 
         // Send the verification to the device
-        send_verify(client, host, &challenge_response.authentication_token, &response).await?;
+        send_verify(
+            client,
+            host,
+            &challenge_response.authentication_token,
+            &response,
+        )
+        .await?;
 
         Ok(challenge_response.authentication_token)
     }
 
     pub async fn get_mode(&self) -> anyhow::Result<DeviceMode> {
         let url = format!("http://{}/xled/v1/led/mode", self.host);
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-Auth-Token", &self.auth_token)
             .send()
@@ -444,16 +491,21 @@ impl ControlInterface {
                 let mode_response = response.json::<ModeResponse>().await?;
                 println!("Mode response: {:#?}", mode_response);
                 println!("Mode: {}", mode_response.mode);
-                let mode = DeviceMode::from_str(&mode_response.mode).map_err(|e| anyhow!("Failed to parse mode: {}", e))?;
+                let mode = DeviceMode::from_str(&mode_response.mode)
+                    .map_err(|e| anyhow!("Failed to parse mode: {}", e))?;
                 Ok(mode)
             }
-            _ => Err(anyhow::anyhow!("Failed to get mode with status: {}", response.status())),
+            _ => Err(anyhow::anyhow!(
+                "Failed to get mode with status: {}",
+                response.status()
+            )),
         }
     }
 
     pub async fn get_timer(&self) -> anyhow::Result<TimerResponse> {
         let url = format!("http://{}/xled/v1/timer", self.host);
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-Auth-Token", &self.auth_token)
             .send()
@@ -465,11 +517,18 @@ impl ControlInterface {
                 let timer_response = response.json::<TimerResponse>().await?;
                 Ok(timer_response)
             }
-            _ => Err(anyhow::anyhow!("Failed to get timer with status: {}", response.status())),
+            _ => Err(anyhow::anyhow!(
+                "Failed to get timer with status: {}",
+                response.status()
+            )),
         }
     }
 
-    pub async fn set_formatted_timer(&self, time_on_str: &str, time_off_str: &str) -> anyhow::Result<()> {
+    pub async fn set_formatted_timer(
+        &self,
+        time_on_str: &str,
+        time_off_str: &str,
+    ) -> anyhow::Result<()> {
         // Parse the time strings into NaiveTime objects
         let time_on = NaiveTime::parse_from_str(time_on_str, "%H:%M:%S")
             .or_else(|_| NaiveTime::parse_from_str(time_on_str, "%H:%M"))
@@ -486,7 +545,8 @@ impl ControlInterface {
         let url = format!("http://{}/xled/v1/timer", self.host);
 
         // Send the request to set the timer
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("X-Auth-Token", &self.auth_token)
             .json(&json!({
@@ -501,13 +561,17 @@ impl ControlInterface {
         if response.status() == StatusCode::OK {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Failed to set timer with status: {}", response.status()))
+            Err(anyhow::anyhow!(
+                "Failed to set timer with status: {}",
+                response.status()
+            ))
         }
     }
 
     pub async fn get_playlist(&self) -> anyhow::Result<PlaylistResponse> {
         let url = format!("http://{}/xled/v1/playlist", self.host);
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-Auth-Token", &self.auth_token)
             .send()
@@ -517,8 +581,8 @@ impl ControlInterface {
             StatusCode::OK => {
                 let response = response.text().await?;
                 println!("Response: {}", response);
-                let playlist_response : PlaylistResponse = serde_json::from_str(&response)?;
-               // let playlist_response = response.json::<PlaylistResponse>().await?;
+                let playlist_response: PlaylistResponse = serde_json::from_str(&response)?;
+                // let playlist_response = response.json::<PlaylistResponse>().await?;
                 Ok(playlist_response)
             }
             _ => Err(response.error_for_status().unwrap_err().into()),
@@ -528,7 +592,8 @@ impl ControlInterface {
     /// Fetches the LED layout from the device.
     pub async fn fetch_layout(&self) -> anyhow::Result<LayoutResponse> {
         let url = format!("http://{}/xled/v1/led/layout/full", self.host);
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-Auth-Token", &self.auth_token)
             .send()
@@ -542,13 +607,17 @@ impl ControlInterface {
                 .context("Failed to deserialize layout response")?;
             Ok(layout_response)
         } else {
-            Err(anyhow::anyhow!("Failed to fetch layout with status: {}", response.status()))
+            Err(anyhow::anyhow!(
+                "Failed to fetch layout with status: {}",
+                response.status()
+            ))
         }
     }
 
     pub async fn get_device_capacity(&self) -> anyhow::Result<usize> {
         let url = format!("http://{}/xled/v1/led/movies", self.host);
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("X-Auth-Token", &self.auth_token)
             .send()
@@ -562,15 +631,19 @@ impl ControlInterface {
                 } else {
                     Err(anyhow!("Failed to get available frames from response"))
                 }
-            },
-            _ => Err(anyhow!("Failed to get device capacity with status: {}", response.status())),
+            }
+            _ => Err(anyhow!(
+                "Failed to get device capacity with status: {}",
+                response.status()
+            )),
         }
     }
 
     /// Clears all uploaded movies from the device.
     pub async fn clear_movies(&self) -> anyhow::Result<()> {
         let url = format!("http://{}/xled/v1/led/movies", self.host);
-        let response = self.client
+        let response = self
+            .client
             .delete(&url)
             .header("X-Auth-Token", &self.auth_token)
             .send()
@@ -578,11 +651,12 @@ impl ControlInterface {
 
         match response.status() {
             StatusCode::NO_CONTENT => Ok(()),
-            _ => Err(anyhow!("Failed to clear movies with status: {}", response.status())),
+            _ => Err(anyhow!(
+                "Failed to clear movies with status: {}",
+                response.status()
+            )),
         }
     }
-
-
 
     /// Converts a vector of frames into a binary movie format.
     /// This function handles both RGB and RGBW LED profiles.
@@ -595,7 +669,7 @@ impl ControlInterface {
                         movie_data.push(r);
                         movie_data.push(g);
                         movie_data.push(b);
-                    },
+                    }
                     LedProfile::RGBW => {
                         // Calculate the white component as the minimum of r, g, b
                         let w = r.min(g).min(b);
@@ -603,13 +677,12 @@ impl ControlInterface {
                         movie_data.push(g - w);
                         movie_data.push(b - w);
                         movie_data.push(w);
-                    },
+                    }
                 }
             }
         }
         movie_data
     }
-
 
     // ... other methods ...
 }
@@ -643,15 +716,15 @@ pub struct DeviceInfoResponse {
 }
 
 fn deserialize_duration_millis<'de, D>(deserializer: D) -> anyhow::Result<Duration, D::Error>
-    where
-        D: Deserializer<'de>,
+where
+    D: Deserializer<'de>,
 {
     let millis_str: String = Deserialize::deserialize(deserializer)?;
-    millis_str.parse::<u64>()
+    millis_str
+        .parse::<u64>()
         .map(Duration::from_millis)
         .map_err(serde::de::Error::custom)
 }
-
 
 #[derive(Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "UPPERCASE")]
@@ -668,13 +741,12 @@ pub struct PlaylistEntry {
     pub name: String,
     pub duration: u32,
     pub handle: u32,
-
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlaylistResponse {
-    pub entries : Vec<PlaylistEntry>,
-    pub unique_id : String,
+    pub entries: Vec<PlaylistEntry>,
+    pub unique_id: String,
     pub name: String,
     pub code: u32,
 }
@@ -720,8 +792,6 @@ pub enum Axis {
 pub struct Challenge {
     challenge: String,
 }
-
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RGB {
@@ -774,10 +844,7 @@ impl FromStr for CliColors {
             _ => Err(anyhow!("Invalid color")),
         }
     }
-
 }
-
-
 
 impl From<CliDeviceMode> for DeviceMode {
     fn from(mode: CliDeviceMode) -> Self {
@@ -795,31 +862,96 @@ impl From<CliDeviceMode> for DeviceMode {
 impl From<CliColors> for RGB {
     fn from(color: CliColors) -> Self {
         match color {
-            CliColors::Red => RGB { red: 255, green: 0, blue: 0 },
-            CliColors::Green => RGB { red: 0, green: 255, blue: 0 },
-            CliColors::Blue => RGB { red: 0, green: 0, blue: 255 },
-            CliColors::Yellow => RGB { red: 255, green: 255, blue: 0 },
-            CliColors::Orange => RGB { red: 255, green: 165, blue: 0 },
-            CliColors::Purple => RGB { red: 128, green: 0, blue: 128 },
-            CliColors::Cyan => RGB { red: 0, green: 255, blue: 255 },
-            CliColors::Magenta => RGB { red: 255, green: 0, blue: 255 },
-            CliColors::Lime => RGB { red: 50, green: 205, blue: 50 },
-            CliColors::Pink => RGB { red: 255, green: 192, blue: 203 },
-            CliColors::Teal => RGB { red: 0, green: 128, blue: 128 },
-            CliColors::Lavender => RGB { red: 230, green: 230, blue: 250 },
-            CliColors::Brown => RGB { red: 165, green: 42, blue: 42 },
-            CliColors::Beige => RGB { red: 245, green: 245, blue: 220 },
-            CliColors::Maroon => RGB { red: 128, green: 0, blue: 0 },
-            CliColors::Mint => RGB { red: 189, green: 252, blue: 201 },
-
+            CliColors::Red => RGB {
+                red: 255,
+                green: 0,
+                blue: 0,
+            },
+            CliColors::Green => RGB {
+                red: 0,
+                green: 255,
+                blue: 0,
+            },
+            CliColors::Blue => RGB {
+                red: 0,
+                green: 0,
+                blue: 255,
+            },
+            CliColors::Yellow => RGB {
+                red: 255,
+                green: 255,
+                blue: 0,
+            },
+            CliColors::Orange => RGB {
+                red: 255,
+                green: 165,
+                blue: 0,
+            },
+            CliColors::Purple => RGB {
+                red: 128,
+                green: 0,
+                blue: 128,
+            },
+            CliColors::Cyan => RGB {
+                red: 0,
+                green: 255,
+                blue: 255,
+            },
+            CliColors::Magenta => RGB {
+                red: 255,
+                green: 0,
+                blue: 255,
+            },
+            CliColors::Lime => RGB {
+                red: 50,
+                green: 205,
+                blue: 50,
+            },
+            CliColors::Pink => RGB {
+                red: 255,
+                green: 192,
+                blue: 203,
+            },
+            CliColors::Teal => RGB {
+                red: 0,
+                green: 128,
+                blue: 128,
+            },
+            CliColors::Lavender => RGB {
+                red: 230,
+                green: 230,
+                blue: 250,
+            },
+            CliColors::Brown => RGB {
+                red: 165,
+                green: 42,
+                blue: 42,
+            },
+            CliColors::Beige => RGB {
+                red: 245,
+                green: 245,
+                blue: 220,
+            },
+            CliColors::Maroon => RGB {
+                red: 128,
+                green: 0,
+                blue: 0,
+            },
+            CliColors::Mint => RGB {
+                red: 189,
+                green: 252,
+                blue: 201,
+            },
         }
     }
 }
 
-
-
-
-async fn send_verify(client: &Client, ip: &str, auth_token: &str, challenge_response: &str) -> anyhow::Result<()> {
+async fn send_verify(
+    client: &Client,
+    ip: &str,
+    auth_token: &str,
+    challenge_response: &str,
+) -> anyhow::Result<()> {
     let verify_url = format!("http://{}/xled/v1/verify", ip);
 
     let response = client
@@ -840,7 +972,10 @@ async fn send_verify(client: &Client, ip: &str, auth_token: &str, challenge_resp
                 println!("Verify response code is 1000");
                 Ok(())
             } else {
-                Err(anyhow::anyhow!("Verification failed with code: {}", verify_response.code))
+                Err(anyhow::anyhow!(
+                    "Verification failed with code: {}",
+                    verify_response.code
+                ))
             }
         }
         _ => {
@@ -848,9 +983,7 @@ async fn send_verify(client: &Client, ip: &str, auth_token: &str, challenge_resp
             Err(anyhow::anyhow!(error_msg))
         }
     }
-
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LoginResponse {
@@ -865,7 +998,6 @@ struct VerifyResponse {
     code: u32,
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 struct ChallengeResponse {
     #[serde(rename = "challenge-response")]
@@ -879,36 +1011,50 @@ struct Mode {
 }
 
 pub fn generate_color_wheel_gradient(num_leds: usize, offset: usize) -> Vec<(u8, u8, u8)> {
-    (0..num_leds).map(|i| {
-        // Calculate the index with offset, wrapping around using modulo if the offset is larger than num_leds
-        let offset_index = (i + offset) % num_leds;
-        // Calculate the hue for this LED, spreading the hues evenly across the color wheel
-        let hue = offset_index as f32 / num_leds as f32 * 360.0;
-        // Create an HSL color with full saturation and lightness for a fully saturated color
-        let hsl_color = Hsl::new(hue, 1.0, 0.5);
-        // Convert the HSL color to RGB
-        let rgb_color = Srgb::from_color(hsl_color);
-        // Convert the RGB color to 8-bit color components
-        let (r, g, b) = rgb_color.into_components();
-        ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
-    }).collect()
+    (0..num_leds)
+        .map(|i| {
+            // Calculate the index with offset, wrapping around using modulo if the offset is larger than num_leds
+            let offset_index = (i + offset) % num_leds;
+            // Calculate the hue for this LED, spreading the hues evenly across the color wheel
+            let hue = offset_index as f32 / num_leds as f32 * 360.0;
+            // Create an HSL color with full saturation and lightness for a fully saturated color
+            let hsl_color = Hsl::new(hue, 1.0, 0.5);
+            // Convert the HSL color to RGB
+            let rgb_color = Srgb::from_color(hsl_color);
+            // Convert the RGB color to 8-bit color components
+            let (r, g, b) = rgb_color.into_components();
+            ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+        })
+        .collect()
 }
 
-
-fn generate_color_gradient_along_axis(leds: &Vec<LedCoordinate>, axis: Axis, offset: f64) -> Vec<(u8, u8, u8)> {
-    assert!((0.0..1.0).contains(&offset), "Offset must be in the range [0.0, 1.0)");
+fn generate_color_gradient_along_axis(
+    leds: &Vec<LedCoordinate>,
+    axis: Axis,
+    offset: f64,
+) -> Vec<(u8, u8, u8)> {
+    assert!(
+        (0.0..1.0).contains(&offset),
+        "Offset must be in the range [0.0, 1.0)"
+    );
 
     // Determine the range of the specified axis
     let (min_value, max_value) = match axis {
-        Axis::X => leds.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), led| {
-            (min.min(led.x), max.max(led.x))
-        }),
-        Axis::Y => leds.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), led| {
-            (min.min(led.y), max.max(led.y))
-        }),
-        Axis::Z => leds.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), led| {
-            (min.min(led.z), max.max(led.z))
-        }),
+        Axis::X => leds
+            .iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), led| {
+                (min.min(led.x), max.max(led.x))
+            }),
+        Axis::Y => leds
+            .iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), led| {
+                (min.min(led.y), max.max(led.y))
+            }),
+        Axis::Z => leds
+            .iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), led| {
+                (min.min(led.z), max.max(led.z))
+            }),
     };
 
     // Calculate the total range
@@ -918,31 +1064,37 @@ fn generate_color_gradient_along_axis(leds: &Vec<LedCoordinate>, axis: Axis, off
     let offset_value = total_range * offset;
 
     // Map each LED's position to a hue value and convert to RGB
-    leds.iter().map(|led| {
-        // Determine the position of the LED on the specified axis
-        let position = match axis {
-            Axis::X => led.x,
-            Axis::Y => led.y,
-            Axis::Z => led.z,
-        };
+    leds.iter()
+        .map(|led| {
+            // Determine the position of the LED on the specified axis
+            let position = match axis {
+                Axis::X => led.x,
+                Axis::Y => led.y,
+                Axis::Z => led.z,
+            };
 
-        // Apply the offset and wrap around using modulo to ensure the gradient is continuous
-        let adjusted_position = (position - min_value + offset_value) % total_range;
-        let hue = (adjusted_position / total_range) * 360.0;
+            // Apply the offset and wrap around using modulo to ensure the gradient is continuous
+            let adjusted_position = (position - min_value + offset_value) % total_range;
+            let hue = (adjusted_position / total_range) * 360.0;
 
-        // Create an HSL color with full saturation and lightness for a fully saturated color
-        let hsl_color = Hsl::new(hue as f32, 1.0, 0.5);
+            // Create an HSL color with full saturation and lightness for a fully saturated color
+            let hsl_color = Hsl::new(hue as f32, 1.0, 0.5);
 
-        // Convert the HSL color to RGB
-        let rgb_color: Srgb = hsl_color.into_color();
+            // Convert the HSL color to RGB
+            let rgb_color: Srgb = hsl_color.into_color();
 
-        // Convert the RGB color to 8-bit color components
-        let (r, g, b) = rgb_color.into_components();
-        ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
-    }).collect()
+            // Convert the RGB color to 8-bit color components
+            let (r, g, b) = rgb_color.into_components();
+            ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+        })
+        .collect()
 }
 
-async fn send_challenge(client: &Client, ip: &str, challenge: &[u8]) -> anyhow::Result<ChallengeResponse> {
+async fn send_challenge(
+    client: &Client,
+    ip: &str,
+    challenge: &[u8],
+) -> anyhow::Result<ChallengeResponse> {
     let login_url = format!("http://{}/xled/v1/login", ip);
     let challenge_b64 = base64::encode(challenge);
 
@@ -956,18 +1108,17 @@ async fn send_challenge(client: &Client, ip: &str, challenge: &[u8]) -> anyhow::
         .context("Failed to send authentication challenge")?;
 
     if response.status() != 200 {
-        anyhow::bail!("Authentication challenge failed with status: {}", response.status());
+        anyhow::bail!(
+            "Authentication challenge failed with status: {}",
+            response.status()
+        );
     }
 
     println!("Challenge response: {:?}", response);
     let content = response.text().await?;
     println!("Challenge response content: {:?}", content);
-    let challenge_response: ChallengeResponse = serde_json::from_str(&content)
-        .context("Failed to deserialize challenge response")?;
+    let challenge_response: ChallengeResponse =
+        serde_json::from_str(&content).context("Failed to deserialize challenge response")?;
 
     Ok(challenge_response)
 }
-
-
-
-

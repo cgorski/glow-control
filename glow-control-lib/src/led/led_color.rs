@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ColorStyle {
@@ -104,52 +104,118 @@ impl LedColor {
     }
 
     pub fn color_brightness(&self, r: f64, g: f64, b: f64) -> f64 {
-        [r, g, b].iter().zip(self.brightness.iter()).map(|(&c, &br)| c * br).sum()
+        [r, g, b]
+            .iter()
+            .zip(self.brightness.iter())
+            .map(|(&c, &br)| c * br)
+            .sum()
     }
 
     pub fn rgb_color(&self, r: f64, g: f64, b: f64) -> (u8, u8, u8) {
-        let rgb = [r, g, b].iter().zip(self.balance.iter()).map(|(&c, &bal)| {
-            let value = (255.0 * bal * self.color_gamma(c)).round().clamp(0.0, 255.0);
-            value as u8
-        }).collect::<Vec<u8>>();
+        let rgb = [r, g, b]
+            .iter()
+            .zip(self.balance.iter())
+            .map(|(&c, &bal)| {
+                let value = (255.0 * bal * self.color_gamma(c))
+                    .round()
+                    .clamp(0.0, 255.0);
+                value as u8
+            })
+            .collect::<Vec<u8>>();
         (rgb[0], rgb[1], rgb[2])
     }
 
     pub fn image_to_led_rgb(&self, r: u8, g: u8, b: u8) -> (u8, u8, u8) {
-        let rgb = [r, g, b].iter().zip(self.balance.iter()).map(|(&c, &bal)| {
-            let value = (255.0 * bal * self.color_gamma(Self::inv_color_gamma_image(c as f64 / 255.0))).round().clamp(0.0, 255.0);
-            value as u8
-        }).collect::<Vec<u8>>();
+        let rgb = [r, g, b]
+            .iter()
+            .zip(self.balance.iter())
+            .map(|(&c, &bal)| {
+                let value =
+                    (255.0 * bal * self.color_gamma(Self::inv_color_gamma_image(c as f64 / 255.0)))
+                        .round()
+                        .clamp(0.0, 255.0);
+                value as u8
+            })
+            .collect::<Vec<u8>>();
         (rgb[0], rgb[1], rgb[2])
     }
 
     pub fn led_to_image_rgb(&self, r: u8, g: u8, b: u8) -> (u8, u8, u8) {
-        let rgb = [r, g, b].iter().zip(self.balance.iter()).map(|(&c, &bal)| {
-            let value = (255.0 * Self::color_gamma_image(self.inv_color_gamma(c as f64 / (bal * 255.0)))).round().clamp(0.0, 255.0);
-            value as u8
-        }).collect::<Vec<u8>>();
+        let rgb = [r, g, b]
+            .iter()
+            .zip(self.balance.iter())
+            .map(|(&c, &bal)| {
+                let value = (255.0
+                    * Self::color_gamma_image(self.inv_color_gamma(c as f64 / (bal * 255.0))))
+                .round()
+                .clamp(0.0, 255.0);
+                value as u8
+            })
+            .collect::<Vec<u8>>();
         (rgb[0], rgb[1], rgb[2])
     }
 
     pub fn hsl_color(&self, h: f64, s: f64, l: f64) -> (u8, u8, u8) {
         let hramp = match self.col_style.color_style {
-            ColorStyle::Col3 => vec![0.0, 1.0 / 6.0, 2.0 / 6.0, 3.0 / 6.0, 4.0 / 6.0, 5.0 / 6.0, 1.0],
-            ColorStyle::Col4 => vec![0.0, 1.0 / 8.0, 1.0 / 4.0, 2.0 / 4.0, 3.0 / 4.0, 7.0 / 8.0, 1.0],
-            ColorStyle::Col6 => vec![0.0, 1.0 / 12.0, 1.0 / 6.0, 1.0 / 3.0, 2.0 / 3.0, 3.0 / 4.0, 1.0],
-            ColorStyle::Col8 => vec![0.0, 1.0 / 8.0, 2.0 / 8.0, 3.0 / 8.0, 5.0 / 8.0, 6.0 / 8.0, 1.0],
-            ColorStyle::Col10 => vec![0.0, 2.0 / 10.0, 3.0 / 10.0, 4.0 / 10.0, 7.0 / 10.0, 8.0 / 10.0, 1.0],
+            ColorStyle::Col3 => vec![
+                0.0,
+                1.0 / 6.0,
+                2.0 / 6.0,
+                3.0 / 6.0,
+                4.0 / 6.0,
+                5.0 / 6.0,
+                1.0,
+            ],
+            ColorStyle::Col4 => vec![
+                0.0,
+                1.0 / 8.0,
+                1.0 / 4.0,
+                2.0 / 4.0,
+                3.0 / 4.0,
+                7.0 / 8.0,
+                1.0,
+            ],
+            ColorStyle::Col6 => vec![
+                0.0,
+                1.0 / 12.0,
+                1.0 / 6.0,
+                1.0 / 3.0,
+                2.0 / 3.0,
+                3.0 / 4.0,
+                1.0,
+            ],
+            ColorStyle::Col8 => vec![
+                0.0,
+                1.0 / 8.0,
+                2.0 / 8.0,
+                3.0 / 8.0,
+                5.0 / 8.0,
+                6.0 / 8.0,
+                1.0,
+            ],
+            ColorStyle::Col10 => vec![
+                0.0,
+                2.0 / 10.0,
+                3.0 / 10.0,
+                4.0 / 10.0,
+                7.0 / 10.0,
+                8.0 / 10.0,
+                1.0,
+            ],
         };
 
         let balance = &self.balance;
         let (ir, ig, ib) = (1.0 / balance[0], 1.0 / balance[1], 1.0 / balance[2]);
         let (irg, irb, igb) = (ir.min(ig), ir.min(ib), ig.min(ib));
-        let iramp = [(0.0, 0.0, ib),
+        let iramp = [
+            (0.0, 0.0, ib),
             (0.0, igb / 2.0, igb / 2.0),
             (0.0, ig, 0.0),
             (irg / 2.0, irg / 2.0, 0.0),
             (ir, 0.0, 0.0),
             (irb / 2.0, 0.0, irb / 2.0),
-            (0.0, 0.0, ib)];
+            (0.0, 0.0, ib),
+        ];
 
         let mut i = 0;
         while h > hramp[i + 1] {
@@ -176,7 +242,9 @@ impl LedColor {
             LightnessPolicy::Equilight => {
                 let br = self.color_brightness(r, g, b);
                 let e = r.max(g).max(b);
-                let p = 1.0_f64.min((1.0 - ll / e) / (1.0 - br)).min((1.0 - ll * balance[1]) / (1.0 - self.brightness[1]));
+                let p = 1.0_f64
+                    .min((1.0 - ll / e) / (1.0 - br))
+                    .min((1.0 - ll * balance[1]) / (1.0 - self.brightness[1]));
                 let t1 = ll * p / ((br - e) * p + e);
                 let t2 = (ll - t1 * br).max(0.0);
                 (t1, t2)
@@ -188,15 +256,13 @@ impl LedColor {
         self.rgb_color(r * t1 + t2, g * t1 + t2, b * t1 + t2)
     }
 
-
     // ... Any additional methods needed.
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::f64::consts;
     use super::*;
+    use std::f64::consts;
 
     #[test]
     fn test_color_gamma_no_correction() {
@@ -255,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_color_gamma_image_standard_values() {
-        let input:f64 = 0.5;
+        let input: f64 = 0.5;
         let expected = if input > 0.0031308 {
             (input.powf(1.0 / 2.4) * 1.055) - 0.055
         } else {
@@ -271,13 +337,19 @@ mod tests {
 
     #[test]
     fn test_color_gamma_image_high_values() {
-        assert!((LedColor::color_gamma_image(0.5) - ((0.5_f64.powf(1.0 / 2.4) * 1.055) - 0.055)).abs() < 1e-10);
+        assert!(
+            (LedColor::color_gamma_image(0.5) - ((0.5_f64.powf(1.0 / 2.4) * 1.055) - 0.055)).abs()
+                < 1e-10
+        );
     }
 
     #[test]
     fn test_color_gamma_image_edge_cases() {
         assert_eq!(LedColor::color_gamma_image(0.0), 0.0);
-        assert!((LedColor::color_gamma_image(1.0) - ((1.0_f64.powf(1.0 / 2.4) * 1.055) - 0.055)).abs() < 1e-10);
+        assert!(
+            (LedColor::color_gamma_image(1.0) - ((1.0_f64.powf(1.0 / 2.4) * 1.055) - 0.055)).abs()
+                < 1e-10
+        );
     }
 
     #[test]
@@ -300,7 +372,7 @@ mod tests {
 
     #[test]
     fn test_inv_color_gamma_image_high_values() {
-        let input:f64 = 0.5;
+        let input: f64 = 0.5;
         let expected = ((input + 0.055) / 1.055).powf(2.4);
         assert!((LedColor::inv_color_gamma_image(input) - expected).abs() < 1e-10);
     }
@@ -308,7 +380,7 @@ mod tests {
     #[test]
     fn test_inv_color_gamma_image_edge_cases() {
         assert_eq!(LedColor::inv_color_gamma_image(0.0), 0.0);
-        let max_input:f64 = 1.0;
+        let max_input: f64 = 1.0;
         let expected_max = ((max_input + 0.055) / 1.055).powf(2.4);
         assert!((LedColor::inv_color_gamma_image(max_input) - expected_max).abs() < 1e-10);
     }
@@ -319,7 +391,12 @@ mod tests {
         let r = 0.5;
         let g = 0.5;
         let b = 0.5;
-        let expected_brightness :f64 = led_color.brightness.iter().zip([r, g, b].iter()).map(|(br, &c)| br * c).sum();
+        let expected_brightness: f64 = led_color
+            .brightness
+            .iter()
+            .zip([r, g, b].iter())
+            .map(|(br, &c)| br * c)
+            .sum();
         assert_eq!(led_color.color_brightness(r, g, b), expected_brightness);
     }
 
@@ -338,7 +415,12 @@ mod tests {
         let r = 0.5;
         let g = 0.5;
         let b = 0.5;
-        let expected_brightness : f64= led_color.brightness.iter().zip([r, g, b].iter()).map(|(br, &c)| br * c).sum();
+        let expected_brightness: f64 = led_color
+            .brightness
+            .iter()
+            .zip([r, g, b].iter())
+            .map(|(br, &c)| br * c)
+            .sum();
         assert_eq!(led_color.color_brightness(r, g, b), expected_brightness);
     }
 
@@ -379,13 +461,21 @@ mod tests {
         let expected = led_color.image_to_led_rgb(r, g, b);
 
         // Calculate the expected values using the same logic as the function
-        let expected_r = (255.0 * led_color.balance[0] * led_color.color_gamma(LedColor::inv_color_gamma_image(r as f64 / 255.0))).round() as u8;
-        let expected_g = (255.0 * led_color.balance[1] * led_color.color_gamma(LedColor::inv_color_gamma_image(g as f64 / 255.0))).round() as u8;
-        let expected_b = (255.0 * led_color.balance[2] * led_color.color_gamma(LedColor::inv_color_gamma_image(b as f64 / 255.0))).round() as u8;
+        let expected_r = (255.0
+            * led_color.balance[0]
+            * led_color.color_gamma(LedColor::inv_color_gamma_image(r as f64 / 255.0)))
+        .round() as u8;
+        let expected_g = (255.0
+            * led_color.balance[1]
+            * led_color.color_gamma(LedColor::inv_color_gamma_image(g as f64 / 255.0)))
+        .round() as u8;
+        let expected_b = (255.0
+            * led_color.balance[2]
+            * led_color.color_gamma(LedColor::inv_color_gamma_image(b as f64 / 255.0)))
+        .round() as u8;
 
         assert_eq!(expected, (expected_r, expected_g, expected_b));
     }
-
 
     #[test]
     fn test_image_to_led_rgb_extreme_values() {
@@ -404,16 +494,19 @@ mod tests {
         let b = 128;
 
         // Calculate the expected values using the same logic as the function, but with balance set to 1.0
-        let expected_r = (255.0 * led_color.color_gamma(LedColor::inv_color_gamma_image(r as f64 / 255.0))).round() as u8;
-        let expected_g = (255.0 * led_color.color_gamma(LedColor::inv_color_gamma_image(g as f64 / 255.0))).round() as u8;
-        let expected_b = (255.0 * led_color.color_gamma(LedColor::inv_color_gamma_image(b as f64 / 255.0))).round() as u8;
+        let expected_r = (255.0
+            * led_color.color_gamma(LedColor::inv_color_gamma_image(r as f64 / 255.0)))
+        .round() as u8;
+        let expected_g = (255.0
+            * led_color.color_gamma(LedColor::inv_color_gamma_image(g as f64 / 255.0)))
+        .round() as u8;
+        let expected_b = (255.0
+            * led_color.color_gamma(LedColor::inv_color_gamma_image(b as f64 / 255.0)))
+        .round() as u8;
 
         let expected = (expected_r, expected_g, expected_b);
         let result = led_color.image_to_led_rgb(r, g, b);
 
         assert_eq!(result, expected);
     }
-
-
 }
-

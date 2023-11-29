@@ -1,10 +1,10 @@
-use std::fs::File;
-use std::io;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
 use crate::util::control::LedProfile;
 use anyhow::Result;
+use std::fs::File;
+use std::io;
 use std::io::Write;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 pub struct Movie {
     pub frames: Vec<Vec<(u8, u8, u8)>>,
@@ -24,7 +24,7 @@ impl Movie {
                         movie_data.push(r);
                         movie_data.push(g);
                         movie_data.push(b);
-                    },
+                    }
                     LedProfile::RGBW => {
                         // Calculate the white component as the minimum of r, g, b
                         let w = r.min(g).min(b);
@@ -32,7 +32,7 @@ impl Movie {
                         movie_data.push(g - w);
                         movie_data.push(b - w);
                         movie_data.push(w);
-                    },
+                    }
                 }
             }
         }
@@ -67,14 +67,12 @@ impl Movie {
             let mut frame = Vec::with_capacity(num_leds);
             for chunk in frame_bytes.chunks(bytes_per_led) {
                 let rgb_tuple = match led_profile {
-                    LedProfile::RGB => {
-                        (chunk[0], chunk[1], chunk[2])
-                    },
+                    LedProfile::RGB => (chunk[0], chunk[1], chunk[2]),
                     LedProfile::RGBW => {
                         // Assuming the white component is the last byte
                         let w = chunk[3];
                         (chunk[0] + w, chunk[1] + w, chunk[2] + w)
-                    },
+                    }
                 };
                 frame.push(rgb_tuple);
             }
@@ -95,7 +93,11 @@ impl Movie {
             LedProfile::RGB => 3,
             LedProfile::RGBW => 4,
         };
-        writeln!(file, "{} {} {} {}", num_frames, num_leds, bytes_per_led, self.fps)?;
+        writeln!(
+            file,
+            "{} {} {} {}",
+            num_frames, num_leds, bytes_per_led, self.fps
+        )?;
 
         // Write the frames
         for frame in &self.frames {
@@ -103,12 +105,12 @@ impl Movie {
                 match led_profile {
                     LedProfile::RGB => {
                         write!(file, "{:02X}{:02X}{:02X}", r, g, b)?;
-                    },
+                    }
                     LedProfile::RGBW => {
                         // Calculate the white component as the minimum of r, g, b
                         let w = r.min(g).min(b);
                         write!(file, "{:02X}{:02X}{:02X}{:02X}", r - w, g - w, b - w, w)?;
-                    },
+                    }
                 }
             }
             writeln!(file)?; // Newline after each frame
@@ -116,7 +118,6 @@ impl Movie {
 
         Ok(())
     }
-
 
     // ... Additional methods ...
 }

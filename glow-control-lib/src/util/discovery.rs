@@ -1,22 +1,17 @@
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 
-use std::net::Ipv4Addr;
-use std::time::Duration;
 use anyhow::Context;
 use log::info;
 use serde::Deserialize;
+use std::net::Ipv4Addr;
+use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::time::timeout;
-
 
 const PING_MESSAGE: &[u8] = b"\x01discover";
 const BROADCAST_ADDRESS: &str = "255.255.255.255:5555";
 const RECEIVE_TIMEOUT: Duration = Duration::from_secs(5);
-
-
-
-
 
 #[derive(Deserialize, Debug)]
 pub struct GestaltResponse {
@@ -38,11 +33,10 @@ pub struct DiscoveryResponse {
 }
 
 impl DiscoveryResponse {
-    pub fn new(ip_address: Ipv4Addr, device_id: String,) -> Self {
+    pub fn new(ip_address: Ipv4Addr, device_id: String) -> Self {
         DiscoveryResponse {
             ip_address,
             device_id,
-
         }
     }
 }
@@ -56,18 +50,22 @@ pub struct DeviceIdentifier {
 }
 
 impl DeviceIdentifier {
-    pub fn new(ip_address: Ipv4Addr, device_id: String, mac_address: String, device_name: String) -> Self {
+    pub fn new(
+        ip_address: Ipv4Addr,
+        device_id: String,
+        mac_address: String,
+        device_name: String,
+    ) -> Self {
         DeviceIdentifier {
             ip_address,
             device_id,
             mac_address,
-            device_name
+            device_name,
         }
     }
 }
 
 pub struct Discovery;
-
 
 impl Discovery {
     pub fn decode_discovery_response(data: &[u8]) -> Option<DiscoveryResponse> {
@@ -98,7 +96,6 @@ impl Discovery {
         })
     }
 
-
     pub async fn find_devices() -> anyhow::Result<HashSet<DeviceIdentifier>> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.set_broadcast(true)?;
@@ -113,17 +110,17 @@ impl Discovery {
             match result {
                 Ok(Ok((number_of_bytes, _src_addr))) => {
                     let received_data = &buffer[..number_of_bytes];
-                    if let Some(discovery_response) = Self::decode_discovery_response(received_data) {
+                    if let Some(discovery_response) = Self::decode_discovery_response(received_data)
+                    {
                         info!("Found device: {:?}", discovery_response);
                         match Self::fetch_gestalt_info(discovery_response.ip_address).await {
-
                             Ok(gestalt_info) => {
                                 info!("MAC address: {}", gestalt_info);
                                 let device = DeviceIdentifier::new(
                                     discovery_response.ip_address,
                                     discovery_response.device_id,
                                     gestalt_info.mac,
-                                    gestalt_info.device_name
+                                    gestalt_info.device_name,
                                 );
                                 discovered_devices.insert(device);
                             }
@@ -161,9 +158,9 @@ impl Discovery {
             Ok(gestalt)
         } else {
             Err(anyhow::anyhow!(
-            "Received non-success status code: {}",
-            response.status()
-        ))
+                "Received non-success status code: {}",
+                response.status()
+            ))
         }
     }
     pub fn pretty_print_devices(devices: &HashSet<DeviceIdentifier>) {
@@ -173,11 +170,7 @@ impl Discovery {
             .map(|d| d.ip_address.to_string().len())
             .max()
             .unwrap_or(0);
-        let max_device_id_width = devices
-            .iter()
-            .map(|d| d.device_id.len())
-            .max()
-            .unwrap_or(0);
+        let max_device_id_width = devices.iter().map(|d| d.device_id.len()).max().unwrap_or(0);
         let max_mac_width = devices
             .iter()
             .map(|d| d.mac_address.len())
@@ -192,7 +185,10 @@ impl Discovery {
         // Print the header with appropriate spacing
         println!(
             "{:<ip_width$} {:<device_id_width$} {:<mac_width$} {:<device_name_width$}",
-            "IP Address", "Device ID", "MAC Address", "Device Name",
+            "IP Address",
+            "Device ID",
+            "MAC Address",
+            "Device Name",
             ip_width = max_ip_width + 2, // Add some padding
             device_id_width = max_device_id_width + 2,
             mac_width = max_mac_width + 2,
@@ -227,7 +223,4 @@ impl Discovery {
             );
         }
     }
-
-
-
 }

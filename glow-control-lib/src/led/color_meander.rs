@@ -1,6 +1,6 @@
-use std::f64::consts::PI;
-use rand::Rng;
 use crate::led::led_color::LedColor;
+use rand::Rng;
+use std::f64::consts::PI;
 
 pub enum MeanderStyle {
     Sphere,
@@ -49,7 +49,7 @@ impl ColorMeander {
                 let s = (x * x + y * y).sqrt().min(1.0);
                 let l = z;
                 (h, s, l)
-            },
+            }
             _ => {
                 let h = y.atan2(x) / (2.0 * PI) + 0.5;
                 let l = z.asin() * 2.0 / PI;
@@ -57,7 +57,7 @@ impl ColorMeander {
                 let r0 = (1.0 - z * z).sqrt();
                 let s = if r0 > 0.0 { r / r0 } else { 0.0 }.min(1.0);
                 (h, s, l)
-            },
+            }
         }
     }
     fn xyz_color(&self, x: f64, y: f64, z: f64, led_color: &LedColor) -> (u8, u8, u8) {
@@ -110,7 +110,7 @@ impl ColorMeander {
                     ndir_y = ndir_y * delta / nrm;
                     ndir_z = sgn - nz;
                 }
-            },
+            }
             MeanderStyle::Surface => {
                 let nrm = (nx * nx + ny * ny + nz * nz).sqrt();
                 nx /= nrm;
@@ -120,7 +120,7 @@ impl ColorMeander {
                 ndir_x += rng.gen_range(-self.noise_level..self.noise_level);
                 ndir_y += rng.gen_range(-self.noise_level..self.noise_level);
                 ndir_z += rng.gen_range(-self.noise_level..self.noise_level);
-            },
+            }
             _ => {
                 let nrm = (nx * nx + ny * ny + nz * nz).sqrt();
                 if nrm > 1.0 {
@@ -132,7 +132,7 @@ impl ColorMeander {
                 ndir_x += rng.gen_range(-self.noise_level..self.noise_level);
                 ndir_y += rng.gen_range(-self.noise_level..self.noise_level);
                 ndir_z += rng.gen_range(-self.noise_level..self.noise_level);
-            },
+            }
         }
 
         let nrm = (ndir_x * ndir_x + ndir_y * ndir_y + ndir_z * ndir_z).sqrt();

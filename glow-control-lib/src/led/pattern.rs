@@ -1,9 +1,9 @@
-use anyhow::{Result, anyhow};
+use crate::led::led_color::LedColor;
+use anyhow::{anyhow, Result};
 use rand::prelude::SliceRandom;
 use rand::Rng;
-use rand_distr::Poisson;
 use rand_distr::Distribution;
-use crate::led::led_color::LedColor;
+use rand_distr::Poisson;
 
 pub struct Pattern;
 
@@ -51,7 +51,8 @@ impl Pattern {
     }
 
     pub fn blend_colors(rgb1: (u8, u8, u8), rgb2: (u8, u8, u8), prop: f64) -> (u8, u8, u8) {
-        let blend = |c1, c2| ((c1 as f64 * (1.0 - prop) + c2 as f64 * prop).clamp(0.0, 255.0) as u8);
+        let blend =
+            |c1, c2| ((c1 as f64 * (1.0 - prop) + c2 as f64 * prop).clamp(0.0, 255.0) as u8);
         let blended_r = blend(rgb1.0, rgb2.0);
         let blended_g = blend(rgb1.1, rgb2.1);
         let blended_b = blend(rgb1.2, rgb2.2);
@@ -90,8 +91,6 @@ impl Pattern {
         }))
     }
 
-
-
     pub fn sprinkle_pattern(
         &self,
         pat: &mut Vec<(u8, u8, u8)>,
@@ -101,61 +100,100 @@ impl Pattern {
         let n = Pattern::random_poisson(freq)?;
         let mut rng = rand::thread_rng();
         let leds = (0..pat.len()).collect::<Vec<_>>();
-        let inds = leds.choose_multiple(&mut rng, n).cloned().collect::<Vec<_>>();
+        let inds = leds
+            .choose_multiple(&mut rng, n)
+            .cloned()
+            .collect::<Vec<_>>();
         for &i in &inds {
-            let &color = rgblst.choose(&mut rng).ok_or_else(|| anyhow!("Color list is empty"))?;
+            let &color = rgblst
+                .choose(&mut rng)
+                .ok_or_else(|| anyhow!("Color list is empty"))?;
             pat[i] = color;
         }
         Ok(())
     }
 
-    pub fn make_alternating_color_pattern(leds: usize, rgblst: &[(u8, u8, u8)]) -> Vec<(u8, u8, u8)> {
+    pub fn make_alternating_color_pattern(
+        leds: usize,
+        rgblst: &[(u8, u8, u8)],
+    ) -> Vec<(u8, u8, u8)> {
         (0..leds).map(|i| rgblst[i % rgblst.len()]).collect()
     }
 
-    pub fn make_color_spectrum_pattern(leds: usize, offset: usize, lightness: f64, led_color: &LedColor) -> Vec<(u8, u8, u8)> {
-        (0..leds).map(|i| {
-            let hue = ((i + offset) % leds) as f64 / leds as f64;
-            led_color.hsl_color(hue, 1.0, lightness)
-        }).collect()
+    pub fn make_color_spectrum_pattern(
+        leds: usize,
+        offset: usize,
+        lightness: f64,
+        led_color: &LedColor,
+    ) -> Vec<(u8, u8, u8)> {
+        (0..leds)
+            .map(|i| {
+                let hue = ((i + offset) % leds) as f64 / leds as f64;
+                led_color.hsl_color(hue, 1.0, lightness)
+            })
+            .collect()
     }
 
-    pub fn make_random_select_color_pattern(leds: usize, rgblst: &[(u8, u8, u8)], probs: Option<&[f64]>) -> Result<Vec<(u8, u8, u8)>> {
+    pub fn make_random_select_color_pattern(
+        leds: usize,
+        rgblst: &[(u8, u8, u8)],
+        probs: Option<&[f64]>,
+    ) -> Result<Vec<(u8, u8, u8)>> {
         let mut rng = rand::thread_rng();
-        let pattern = (0..leds).map(|_| {
-            if let Some(probs) = probs {
-                let ind = Pattern::random_discrete(probs)?;
-                Ok(rgblst[ind])
-            } else {
-                let ind = rng.gen_range(0..rgblst.len());
-                Ok(rgblst[ind])
-            }
-        }).collect::<Result<Vec<_>>>()?;
+        let pattern = (0..leds)
+            .map(|_| {
+                if let Some(probs) = probs {
+                    let ind = Pattern::random_discrete(probs)?;
+                    Ok(rgblst[ind])
+                } else {
+                    let ind = rng.gen_range(0..rgblst.len());
+                    Ok(rgblst[ind])
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
         Ok(pattern)
     }
 
-    pub fn make_random_blend_color_pattern(leds: usize, rgb1: (u8, u8, u8), rgb2: (u8, u8, u8)) -> Vec<(u8, u8, u8)> {
+    pub fn make_random_blend_color_pattern(
+        leds: usize,
+        rgb1: (u8, u8, u8),
+        rgb2: (u8, u8, u8),
+    ) -> Vec<(u8, u8, u8)> {
         let mut rng = rand::thread_rng();
-        (0..leds).map(|_| {
-            let prop = rng.gen::<f64>();
-            Pattern::blend_colors(rgb1, rgb2, prop)
-        }).collect()
+        (0..leds)
+            .map(|_| {
+                let prop = rng.gen::<f64>();
+                Pattern::blend_colors(rgb1, rgb2, prop)
+            })
+            .collect()
     }
 
-    pub fn make_random_colors_pattern(leds: usize, lightness: f64, led_color: &LedColor) -> Vec<(u8, u8, u8)> {
+    pub fn make_random_colors_pattern(
+        leds: usize,
+        lightness: f64,
+        led_color: &LedColor,
+    ) -> Vec<(u8, u8, u8)> {
         let mut rng = rand::thread_rng();
-        (0..leds).map(|_| {
-            let hue = rng.gen::<f64>();
-            led_color.hsl_color(hue, 1.0, lightness)
-        }).collect()
+        (0..leds)
+            .map(|_| {
+                let hue = rng.gen::<f64>();
+                led_color.hsl_color(hue, 1.0, lightness)
+            })
+            .collect()
     }
 
-    pub fn make_random_lightness_pattern(leds: usize, hue: f64, led_color: &LedColor) -> Vec<(u8, u8, u8)> {
+    pub fn make_random_lightness_pattern(
+        leds: usize,
+        hue: f64,
+        led_color: &LedColor,
+    ) -> Vec<(u8, u8, u8)> {
         let mut rng = rand::thread_rng();
-        (0..leds).map(|_| {
-            let lightness = rng.gen::<f64>() * 2.0 - 1.0;
-            led_color.hsl_color(hue, 1.0, lightness)
-        }).collect()
+        (0..leds)
+            .map(|_| {
+                let lightness = rng.gen::<f64>() * 2.0 - 1.0;
+                led_color.hsl_color(hue, 1.0, lightness)
+            })
+            .collect()
     }
 
     pub fn make_random_hsl_pattern(
@@ -167,8 +205,9 @@ impl Pattern {
     ) -> Result<Vec<(u8, u8, u8)>> {
         // Now we pass the reference directly without dereferencing
         let color_func = Pattern::random_hsl_color_func(hue, sat, light, led_color)?;
-        let pattern = (0..leds).map(|_| color_func()).collect::<Result<Vec<_>>>()?;
+        let pattern = (0..leds)
+            .map(|_| color_func())
+            .collect::<Result<Vec<_>>>()?;
         Ok(pattern)
     }
-
 }

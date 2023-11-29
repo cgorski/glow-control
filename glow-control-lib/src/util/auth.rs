@@ -1,8 +1,8 @@
-use sha1::Sha1;
 use crate::util::rc4::Rc4;
 use anyhow::Result;
 use rand::RngCore;
 use sha1::Digest;
+use sha1::Sha1;
 
 const SHARED_KEY_CHALLENGE: &[u8] = b"evenmoresecret!!";
 pub struct Auth;
@@ -20,8 +20,6 @@ impl Auth {
 
         Ok(hex::encode(result))
     }
-
-
 
     // Helper function to convert a MAC address string to bytes
     pub fn mac_to_bytes(mac: &str) -> Vec<u8> {
@@ -56,6 +54,4 @@ mod tests {
         let challenge = Auth::generate_challenge();
         assert_eq!(challenge.len(), 32);
     }
-
-
 }
