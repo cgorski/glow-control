@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "glow-control-lib",
+    "glow-control",
+]
+resolver = "2"
+
+
