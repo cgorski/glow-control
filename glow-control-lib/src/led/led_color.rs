@@ -280,7 +280,7 @@ mod tests {
     fn test_color_gamma_less_than_one() {
         let mut led_color = LedColor::new();
         led_color.gamma = 0.5; // Gamma less than 1.0
-        assert!((led_color.color_gamma(0.5) - 0.70710678118).abs() < 1e-10);
+        assert!((led_color.color_gamma(0.5) - consts::FRAC_1_SQRT_2).abs() < 1e-10);
     }
 
     #[test]

@@ -4,6 +4,8 @@ pub struct Rc4 {
     s: [u8; 256],
 }
 
+
+#[allow(clippy::needless_range_loop)]
 impl Rc4 {
     pub fn new(key: &[u8]) -> Rc4 {
         assert!(!key.is_empty() && key.len() <= 256);

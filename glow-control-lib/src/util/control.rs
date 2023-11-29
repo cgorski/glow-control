@@ -1029,7 +1029,7 @@ pub fn generate_color_wheel_gradient(num_leds: usize, offset: usize) -> Vec<(u8,
 }
 
 fn generate_color_gradient_along_axis(
-    leds: &Vec<LedCoordinate>,
+    leds: &[LedCoordinate],
     axis: Axis,
     offset: f64,
 ) -> Vec<(u8, u8, u8)> {
