@@ -1,21 +1,14 @@
-
-
 use std::collections::HashSet;
-
 
 use anyhow::{anyhow, Result};
 
+use clap::{Parser, Subcommand};
 
-
-
-
-use sha1::Digest;
+use glow_control_lib::util::control::{CliColors, CliDeviceMode, ControlInterface, RGB};
 
 use std::time::Duration;
 
-
 use glow_control_lib::util::discovery::Discovery;
-
 
 // Function to generate a random challenge
 
@@ -30,14 +23,13 @@ async fn main() -> Result<()> {
 
 // src/cli.rs
 
-use clap::{Parser, Subcommand};
-
-use glow_control_lib::util::control::{CliColors, CliDeviceMode, ControlInterface, RGB};
-
-
 /// This struct defines the command line interface of the application
 #[derive(Parser)]
-#[clap(name = "glow_control", about = "Controls commercial LED devices", version = "1.0")]
+#[clap(
+    name = "glow_control",
+    about = "Controls commercial LED devices",
+    version = "1.0"
+)]
 pub struct Cli {
     #[clap(subcommand)]
     pub command: Commands,
@@ -62,9 +54,7 @@ pub enum Commands {
     },
     /// Subcommand for operations that require device communication
     #[clap(name = "discover")]
-    Discover ,
-
-
+    Discover,
 }
 
 /// Real-time effects that can be applied to the device.
@@ -114,10 +104,11 @@ pub enum RtEffect {
         #[clap(long)]
         frame_rate: f64,
     },
-
 }
 fn parse_duration(s: &str) -> Result<Duration, &'static str> {
-    let millis = s.parse::<u64>().map_err(|_| "could not parse duration in milliseconds")?;
+    let millis = s
+        .parse::<u64>()
+        .map_err(|_| "could not parse duration in milliseconds")?;
     Ok(Duration::from_millis(millis))
 }
 /// Actions available under the `device-call` subcommand
@@ -164,17 +155,11 @@ pub enum DeviceAction {
     },
 }
 
-
-
-
-
-
 async fn handle_cli(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Discover => {
             let devices = Discovery::find_devices().await?;
             Discovery::pretty_print_devices(&devices);
-
         }
         Commands::DeviceCall { ip, mac, action } => {
             let high_control_interface = ControlInterface::new(&ip, &mac).await?;
@@ -222,19 +207,32 @@ async fn handle_cli(cli: Cli) -> Result<()> {
                     println!("The device configuration:\n{:#?}", device_info);
                 }
                 DeviceAction::RealTimeTest => {
-                    high_control_interface.show_real_time_test_color_wheel(0.02, 20.0).await?;
+                    high_control_interface
+                        .show_real_time_test_color_wheel(0.02, 20.0)
+                        .await?;
                     println!("Real-time test color wheel displayed.");
                 }
                 DeviceAction::RtEffect { effect } => {
                     match effect {
-                        RtEffect::ShowColor { color, red, green, blue } => {
+                        RtEffect::ShowColor {
+                            color,
+                            red,
+                            green,
+                            blue,
+                        } => {
                             let color_to_show = match (color, red, green, blue) {
                                 (Some(color_name), None, None, None) => color_name.into(),
-                                (None, Some(r), Some(g), Some(b)) => RGB { red: r, green: g, blue: b },
+                                (None, Some(r), Some(g), Some(b)) => RGB {
+                                    red: r,
+                                    green: g,
+                                    blue: b,
+                                },
                                 _ => return Err(anyhow!("Invalid color specification")),
                             };
 
-                            high_control_interface.show_solid_color(color_to_show).await?;
+                            high_control_interface
+                                .show_solid_color(color_to_show)
+                                .await?;
                             println!("Displayed color: {:?}", color_to_show);
                         }
                         RtEffect::Shine {
@@ -246,33 +244,30 @@ async fn handle_cli(cli: Cli) -> Result<()> {
                             frame_rate,
                         } => {
                             // Convert the list of CliColors to a HashSet of RGB
-                            let color_set: HashSet<RGB> = colors.into_iter().map(Into::into).collect();
+                            let color_set: HashSet<RGB> =
+                                colors.into_iter().map(Into::into).collect();
 
                             // Check if the color set is not empty
                             if color_set.is_empty() {
                                 return Err(anyhow!("At least one color must be specified"));
                             }
-                            high_control_interface.shine_leds(
-
-                                time_between_glow_start,
-                                time_to_max_glow,
-                                time_to_fade,
-                                color_set,
-                                frame_rate,
-                                num_start_simultaneous,
-                            )
+                            high_control_interface
+                                .shine_leds(
+                                    time_between_glow_start,
+                                    time_to_max_glow,
+                                    time_to_fade,
+                                    color_set,
+                                    frame_rate,
+                                    num_start_simultaneous,
+                                )
                                 .await?;
                             println!("Shine effect started.");
                         }
                     }
                 }
-
             }
         }
-
     }
 
     Ok(())
 }
-
-

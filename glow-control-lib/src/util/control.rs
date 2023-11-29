@@ -99,6 +99,10 @@ impl ControlInterface {
         })
     }
 
+    pub fn get_hw_address(&self) -> String {
+        self.hw_address.clone()
+    }
+
     pub async fn shine_leds(
         &self,
         time_between_glow_start: Duration,
@@ -613,29 +617,29 @@ impl ControlInterface {
 // Define a struct to deserialize the device information response
 #[derive(Deserialize, Debug)]
 pub struct DeviceInfoResponse {
-    product_name: String,
-    hardware_version: String,
-    bytes_per_led: usize,
-    hw_id: String,
-    flash_size: usize,
-    led_type: usize,
-    product_code: String,
-    fw_family: String,
-    device_name: String,
+    pub product_name: String,
+    pub hardware_version: String,
+    pub bytes_per_led: usize,
+    pub hw_id: String,
+    pub flash_size: usize,
+    pub led_type: usize,
+    pub product_code: String,
+    pub fw_family: String,
+    pub device_name: String,
     #[serde(deserialize_with = "deserialize_duration_millis")]
-    uptime: Duration, // Uptime is now an unsigned 64-bit integer
-    mac: String,
-    uuid: String,
-    max_supported_led: usize,
-    number_of_led: usize,
-    led_profile: LedProfile, // LedProfile is now an enum
-    frame_rate: f64,
-    measured_frame_rate: f64,
-    movie_capacity: usize,
-    max_movies: usize,
-    wire_type: usize,
-    copyright: String,
-    code: usize,
+    pub uptime: Duration, // Uptime is now an unsigned 64-bit integer
+    pub mac: String,
+    pub uuid: String,
+    pub max_supported_led: usize,
+    pub number_of_led: usize,
+    pub led_profile: LedProfile, // LedProfile is now an enum
+    pub frame_rate: f64,
+    pub measured_frame_rate: f64,
+    pub movie_capacity: usize,
+    pub max_movies: usize,
+    pub wire_type: usize,
+    pub copyright: String,
+    pub code: usize,
 }
 
 fn deserialize_duration_millis<'de, D>(deserializer: D) -> anyhow::Result<Duration, D::Error>
@@ -699,11 +703,11 @@ pub struct LedCoordinate {
 // Define a struct to deserialize the layout response
 #[derive(Deserialize, Debug)]
 pub struct LayoutResponse {
-    source: String,
-    synthesized: bool,
-    uuid: String,
-    coordinates: Vec<LedCoordinate>,
-    code: u32,
+    pub source: String,
+    pub synthesized: bool,
+    pub uuid: String,
+    pub coordinates: Vec<LedCoordinate>,
+    pub code: u32,
 }
 
 pub enum Axis {
@@ -717,31 +721,7 @@ pub struct Challenge {
     challenge: String,
 }
 
-async fn send_login(client: &Client, ip: &str, challenge: &[u8]) -> anyhow::Result<LoginResponse> {
-    let login_url = format!("http://{}/xled/v1/login", ip);
-    let challenge_b64 = base64::encode(challenge);
 
-    let response = client
-        .post(&login_url)
-        .json(&json!({ "challenge": challenge_b64 }))
-        .send()
-        .await
-        .context("Failed to send login challenge")?;
-
-    match response.status() {
-        StatusCode::OK => {
-            let login_response = response
-                .json::<LoginResponse>()
-                .await
-                .context("Failed to deserialize login response")?;
-            Ok(login_response)
-        }
-        _ => {
-            let error_msg = format!("Login challenge failed with status: {}", response.status());
-            Err(anyhow::anyhow!(error_msg))
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RGB {
@@ -990,23 +970,4 @@ async fn send_challenge(client: &Client, ip: &str, challenge: &[u8]) -> anyhow::
 
 
 
-async fn get_timer(client: &Client, ip: &str, auth_token: &str) -> anyhow::Result<TimerResponse> {
-    let timer_url = format!("http://{}/xled/v1/timer", ip);
-    let response = client
-        .get(&timer_url)
-        .header("X-Auth-Token", auth_token)
-        .send()
-        .await
-        .context("Failed to get timer")?;
 
-    if response.status() != StatusCode::OK {
-        anyhow::bail!("Get timer failed with status: {}", response.status());
-    }
-
-    let timer_response: TimerResponse = response
-        .json()
-        .await
-        .context("Failed to deserialize timer response")?;
-
-    Ok(timer_response)
-}
