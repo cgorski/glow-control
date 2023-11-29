@@ -51,7 +51,7 @@ To discover Twinkly devices on your network:
 To set the device mode:
 
 ```bash
-./glow_control device-call --ip <DEVICE_IP> --mac <DEVICE_MAC> set-mode --mode <MODE>
+./glow_control device-call --ip <DEVICE_IP> --mac <DEVICE_MAC> set-mode <MODE>
 ```
 
 ### Show Solid Color
