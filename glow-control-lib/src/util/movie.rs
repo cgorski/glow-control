@@ -88,7 +88,7 @@ impl Movie {
 
         // Write the header
         let num_frames = self.frames.len();
-        let num_leds = self.frames.get(0).map_or(0, Vec::len);
+        let num_leds = self.frames.first().map_or(0, Vec::len);
         let bytes_per_led = match led_profile {
             LedProfile::RGB => 3,
             LedProfile::RGBW => 4,

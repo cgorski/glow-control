@@ -21,6 +21,12 @@ pub struct ColorModel {
     lightness_policy: LightnessPolicy,
 }
 
+impl Default for ColorModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ColorModel {
     pub fn new() -> Self {
         ColorModel {
