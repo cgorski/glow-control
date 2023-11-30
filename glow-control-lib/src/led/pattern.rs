@@ -67,6 +67,7 @@ impl Pattern {
         (r, g, b)
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn random_hsl_color_func<'a>(
         hue: Option<(f64, f64)>,
         sat: Option<(f64, f64)>,

@@ -298,6 +298,7 @@ mod tests {
         assert_eq!(led_color.color_gamma(1.0), 1.0);
     }
 
+    #[test]
     fn test_inv_color_gamma_no_correction() {
         let led_color = LedColor::new();
         assert_eq!(led_color.inv_color_gamma(0.5), 0.5);
