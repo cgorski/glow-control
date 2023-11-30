@@ -1,3 +1,7 @@
+![Build Status](https://github.com/cgorski/glow-control/actions/workflows/rust.yml/badge.svg?branch=main)
+[![Crates.io](https://img.shields.io/crates/v/glow-control.svg)](https://crates.io/crates/glow-control)
+
+
 # Glow Control CLI for Twinkly LEDs
 
 The `glow-control` crate is a command-line interface (CLI) application for controlling Twinkly LED devices. It leverages the `glow-control-lib` library to provide users with the ability to discover devices on their network, control lighting effects, and manage device settings.
@@ -17,8 +21,16 @@ This project is heavily based on the Python libraries [xled](https://github.com/
 To install the CLI application, ensure you have Rust and Cargo installed, then run:
 
 ```bash
+cargo install glow-control
+```
+
+to install from crates-io, or:
+
+```bash
 cargo install --path .
 ```
+
+to install directly from the repository.
 
 ## Usage
 
@@ -26,13 +38,13 @@ After installation, you can run the `glow_control` command to interact with your
 
 ```bash
 # Discover Twinkly devices on your network
-glow_control discover
+glow-control discover
 
 # Set the device mode to 'movie'
-glow_control device-call --ip <DEVICE_IP> --mac <DEVICE_MAC> set-mode movie
+glow-control device-call --ip <DEVICE_IP> --mac <DEVICE_MAC> set-mode movie
 
 # Show a solid color
-glow_control device-call --ip <DEVICE_IP> --mac <DEVICE_MAC> rt-effect show-color --color Red
+glow-control device-call --ip <DEVICE_IP> --mac <DEVICE_MAC> rt-effect show-color --color Red
 ```
 
 Replace `<DEVICE_IP>` and `<DEVICE_MAC>` with the IP and MAC address of your Twinkly device.
