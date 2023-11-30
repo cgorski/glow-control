@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::{anyhow, Result};
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 use glow_control_lib::util::control::{CliColors, CliDeviceMode, ControlInterface, RGB};
 
@@ -35,6 +35,17 @@ pub struct Cli {
     pub command: Commands,
 }
 
+/// Supported output formats for the `discover` command.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum OutputFormat {
+    /// Plain text format.
+    Plaintext,
+    /// JSON format.
+    Json,
+    /// YAML format.
+    Yaml,
+}
+
 /// Subcommands available for the CLI
 #[derive(Subcommand)]
 pub enum Commands {
@@ -54,7 +65,15 @@ pub enum Commands {
     },
     /// Subcommand for operations that require device communication
     #[clap(name = "discover")]
-    Discover,
+    Discover {
+        /// Output format (plaintext, json, yaml)
+        #[clap(short, long, value_enum, default_value_t = OutputFormat::Plaintext)]
+        output: OutputFormat,
+
+        /// Search timeout in milliseconds
+        #[clap(short = 't', long = "timeout", default_value_t = 5000)]
+        timeout: u64,
+    },
 }
 
 /// Real-time effects that can be applied to the device.
@@ -157,9 +176,21 @@ pub enum DeviceAction {
 
 async fn handle_cli(cli: Cli) -> Result<()> {
     match cli.command {
-        Commands::Discover => {
-            let devices = Discovery::find_devices().await?;
-            Discovery::pretty_print_devices(&devices);
+        Commands::Discover { output, timeout } => {
+            let devices = Discovery::find_devices(Duration::from_millis(timeout)).await?;
+            match output {
+                OutputFormat::Plaintext => {
+                    Discovery::pretty_print_devices(&devices);
+                }
+                OutputFormat::Json => {
+                    let json = serde_json::to_string(&devices)?;
+                    println!("{}", json);
+                }
+                OutputFormat::Yaml => {
+                    let yaml = serde_yaml::to_string(&devices)?;
+                    println!("{}", yaml);
+                }
+            }
         }
         Commands::DeviceCall { ip, mac, action } => {
             let high_control_interface = ControlInterface::new(&ip, &mac).await?;

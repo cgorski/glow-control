@@ -3,15 +3,14 @@ use std::fmt::{Display, Formatter};
 
 use anyhow::Context;
 use log::info;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 use std::time::Duration;
 use tokio::net::UdpSocket;
-use tokio::time::timeout;
+use tokio::time::{timeout, Instant};
 
 const PING_MESSAGE: &[u8] = b"\x01discover";
 const BROADCAST_ADDRESS: &str = "255.255.255.255:5555";
-const RECEIVE_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Deserialize, Debug)]
 pub struct GestaltResponse {
@@ -41,7 +40,7 @@ impl DiscoveryResponse {
     }
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq, Serialize)]
 pub struct DeviceIdentifier {
     ip_address: Ipv4Addr,
     device_id: String,
@@ -96,7 +95,9 @@ impl Discovery {
         })
     }
 
-    pub async fn find_devices() -> anyhow::Result<HashSet<DeviceIdentifier>> {
+    pub async fn find_devices(
+        given_timeout: Duration,
+    ) -> anyhow::Result<HashSet<DeviceIdentifier>> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.set_broadcast(true)?;
         socket.send_to(PING_MESSAGE, BROADCAST_ADDRESS).await?;
@@ -104,8 +105,15 @@ impl Discovery {
         let mut discovered_devices = HashSet::new();
         let mut buffer = [0; 1024];
 
+        let timeout_end = Instant::now() + given_timeout;
+
         loop {
-            let result = timeout(RECEIVE_TIMEOUT, socket.recv_from(&mut buffer)).await;
+            if Instant::now() >= timeout_end {
+                break;
+            }
+
+            let remaining_time = timeout_end - Instant::now();
+            let result = timeout(remaining_time, socket.recv_from(&mut buffer)).await;
 
             match result {
                 Ok(Ok((number_of_bytes, _src_addr))) => {
@@ -124,16 +132,16 @@ impl Discovery {
                                 );
                                 discovered_devices.insert(device);
                             }
-                            Err(e) => println!("Error fetching MAC address: {:?}", e),
+                            Err(e) => eprintln!("Error fetching MAC address: {:?}", e),
                         }
                     }
                 }
                 Ok(Err(e)) => {
-                    println!("Failed to receive response: {}", e);
+                    eprintln!("Failed to receive response: {}", e);
                     break;
                 }
                 Err(_) => {
-                    println!("Discovery timed out.");
+                    eprintln!("Discovery time complete. If devices are missing, try increasing the search timeout.");
                     break;
                 }
             }

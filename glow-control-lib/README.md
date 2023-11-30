@@ -43,7 +43,6 @@ This library is dual-licensed under the MIT License and the Apache License, Vers
 
 This project is not affiliated with, authorized by, endorsed by, or in any way officially connected with Twinkly or its affiliates. The official Twinkly website can be found at [https://www.twinkly.com](https://www.twinkly.com).
 
-
 ## Contributions
 
 Contributions are welcome! If you would like to contribute to this library, please feel free to open an issue or create a pull request with your improvements or suggestions.
