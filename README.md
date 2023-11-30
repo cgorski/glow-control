@@ -104,7 +104,7 @@ Contributions are welcome! Please feel free to submit pull requests or create is
 
 ## License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is open source and available under the [MIT License](LICENSE-MIT) and [APACHE License](LICENSE-APACHE).
 
 ## Acknowledgments
 
