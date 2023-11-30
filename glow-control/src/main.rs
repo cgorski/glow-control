@@ -64,7 +64,7 @@ pub enum RtEffect {
     #[clap(name = "show-color")]
     ShowColor {
         /// The color to display by name
-        #[clap(arg_enum)]
+        #[clap(value_enum)]
         color: Option<CliColors>,
 
         /// Red component of the color (0-255)
@@ -85,19 +85,19 @@ pub enum RtEffect {
         num_start_simultaneous: usize,
 
         /// The set of colors to use for the brightest state
-        #[clap(long, use_delimiter = true)]
+        #[clap(long, use_value_delimiter = true)]
         colors: Vec<CliColors>,
 
         /// The time between starting the glow of each LED
-        #[clap(long, parse(try_from_str = parse_duration))]
+        #[clap(long, value_parser = parse_duration)]
         time_between_glow_start: Duration,
 
         /// The time for an LED to reach maximum brightness
-        #[clap(long, parse(try_from_str = parse_duration))]
+        #[clap(long, value_parser = parse_duration)]
         time_to_max_glow: Duration,
 
         /// The time for an LED to fade to off
-        #[clap(long, parse(try_from_str = parse_duration))]
+        #[clap(long, value_parser = parse_duration)]
         time_to_fade: Duration,
 
         /// The frame rate for updating LED states
@@ -127,7 +127,7 @@ pub enum DeviceAction {
     #[clap(name = "set-mode")]
     SetMode {
         /// The mode to set the device to
-        #[clap(arg_enum, value_name = "MODE")]
+        #[clap(value_enum)]
         mode: CliDeviceMode,
     },
     /// Fetches the LED layout.

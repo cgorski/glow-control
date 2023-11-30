@@ -3,7 +3,7 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use bytes::{BufMut, BytesMut};
 use chrono::{NaiveTime, Timelike};
-use clap::ArgEnum;
+use clap::ValueEnum;
 use palette::{FromColor, Hsl, IntoColor, Srgb};
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::thread_rng;
@@ -30,7 +30,7 @@ pub struct ControlInterface {
     device_info: DeviceInfoResponse,
 }
 
-#[derive(Debug, Clone, Copy, ArgEnum, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
 pub enum CliDeviceMode {
     Movie,
     Playlist,
@@ -803,7 +803,7 @@ pub struct RGB {
     pub blue: u8,
 }
 
-#[derive(Debug, Clone, Copy, ArgEnum)]
+#[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum CliColors {
     Red,
     Green,
