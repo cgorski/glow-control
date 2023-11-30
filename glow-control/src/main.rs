@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
 #[clap(
     name = "glow_control",
     about = "Controls commercial LED devices",
-    version = "1.0"
+    version = "0.3.3"
 )]
 pub struct Cli {
     #[clap(subcommand)]
