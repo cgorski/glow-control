@@ -5,6 +5,8 @@
 
 This project provides a Rust-based command-line interface (CLI) for controlling Twinkly programmable LED lights. It allows users to interact with Twinkly devices on their network, offering a variety of commands to control lighting effects, colors, and device settings.
 
+This project is heavily based on the python libraries [xled](https://github.com/scrool/xled) and [xled_plus](https://github.com/Anders-Holst/xled_plus) and could not have been accomplished without these amazing projects.
+
 ## Features
 
 - Discover Twinkly devices on the network
