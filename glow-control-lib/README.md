@@ -1,3 +1,7 @@
+![Build Status](https://github.com/cgorski/glow-control/actions/workflows/rust.yml/badge.svg?branch=main)
+[![Crates.io](https://img.shields.io/crates/v/glow-control-lib.svg)](https://crates.io/crates/glow-control-lib)
+
+
 # Glow Control Library for Twinkly LEDs
 
 The `glow-control-lib` crate is a Rust library designed to interface with Twinkly LED devices. It provides a comprehensive set of APIs that facilitate the discovery of devices, manipulation of device modes, control of real-time lighting effects, and more. This library serves as the backbone for the `glow-control` CLI and can be used to build custom applications that manage Twinkly LED lights.
