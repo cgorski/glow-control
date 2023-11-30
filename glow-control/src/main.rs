@@ -4,8 +4,7 @@ use anyhow::{anyhow, Result};
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-use glow_control_lib::util::control::{CliColors, CliDeviceMode, ControlInterface, RGB};
-
+use glow_control_lib::control_interface::{CliColors, CliDeviceMode, ControlInterface, RGB};
 use std::time::Duration;
 
 use glow_control_lib::util::discovery::Discovery;

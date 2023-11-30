@@ -1,4 +1,4 @@
-use crate::util::control::LedProfile;
+use crate::control_interface::LedProfile;
 use anyhow::Result;
 use std::fs::File;
 use std::io;
