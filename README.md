@@ -1,3 +1,5 @@
+![Build Status](https://github.com/cgorski/glow-control/actions/workflows/rust.yml/badge.svg?branch=main)
+
 # Glow Control for Twinkly LEDs
 
 This workspace is the home of `glow-control`, an unofficial Rust-based toolset for controlling Twinkly LED lights. It consists of a command-line interface (CLI) and a library that provides the underlying functionality for the CLI and can be used to integrate Twinkly LED control into other Rust applications.
