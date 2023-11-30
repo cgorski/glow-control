@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context};
-use base64::decode;
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use bytes::{BufMut, BytesMut};
 use chrono::{NaiveTime, Timelike};
 use clap::ArgEnum;
@@ -264,7 +265,9 @@ impl ControlInterface {
         // let version = self.device_info.fw_version; // Assuming fw_version is a field in DeviceInfoResponse
 
         // Decode the access token
-        let access_token = decode(&self.auth_token).context("Failed to decode access token")?;
+        let access_token = STANDARD
+            .decode(&self.auth_token)
+            .context("Failed to decode access token")?;
 
         // Prepare the packet based on the protocol version
         let mut packet = BytesMut::new();
@@ -1096,7 +1099,7 @@ async fn send_challenge(
     challenge: &[u8],
 ) -> anyhow::Result<ChallengeResponse> {
     let login_url = format!("http://{}/xled/v1/login", ip);
-    let challenge_b64 = base64::encode(challenge);
+    let challenge_b64 = STANDARD.encode(challenge);
 
     let response = client
         .post(&login_url)
