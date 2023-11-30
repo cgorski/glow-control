@@ -1,3 +1,7 @@
+![Build Status](https://github.com/cgorski/glow-control/actions/workflows/rust.yml/badge.svg?branch=main)
+[![Crates.io](https://img.shields.io/crates/v/glow-control.svg)](https://crates.io/crates/glow-control)
+
+
 # Glow Control CLI for Twinkly LEDs
 
 The `glow-control` crate is a command-line interface (CLI) application for controlling Twinkly LED devices. It leverages the `glow-control-lib` library to provide users with the ability to discover devices on their network, control lighting effects, and manage device settings.
