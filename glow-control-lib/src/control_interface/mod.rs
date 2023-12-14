@@ -1,4 +1,5 @@
 use crate::util::auth::Auth;
+use crate::util::discovery::DeviceIdentifier;
 use crate::util::movie::Movie;
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose::STANDARD;
@@ -6,13 +7,14 @@ use base64::Engine;
 use bytes::{BufMut, BytesMut};
 use chrono::{NaiveTime, Timelike};
 use clap::ValueEnum;
+use derivative::Derivative;
 use palette::{FromColor, Hsl, IntoColor, Srgb};
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::thread_rng;
 use reqwest::{Client, StatusCode};
-
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt;
 use std::path::Path;
@@ -21,13 +23,52 @@ use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::time::{interval, sleep, Instant};
 
+/// Twinkly hardware version.
+pub enum HardwareVersion {
+    Version1,
+    Version2,
+    Version3,
+}
+
 #[derive(Debug)]
 pub struct ControlInterface {
-    host: String,
+    pub host: String,
     hw_address: String,
     auth_token: String,
     client: Client,
     device_info: DeviceInfoResponse,
+}
+
+/**
+Compare everything, except the client, since this that is a utility, and not a device describing
+identifier. Also ignoring the token, since this changes on every new connection,
+while the device stays the same.
+ */
+impl PartialEq for ControlInterface {
+    fn eq(&self, other: &ControlInterface) -> bool {
+        self.device_info == other.device_info
+            && self.host == other.host
+            && self.hw_address == other.hw_address
+    }
+}
+
+/**
+Sort in that order:
+1. device_info
+2. host
+3. hw_address
+ */
+impl PartialOrd for ControlInterface {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let mut ord: Ordering = self.device_info.partial_cmp(&other.device_info).unwrap();
+        if ord.is_eq() {
+            ord = self.host.cmp(&other.host);
+            if ord.is_eq() {
+                ord = self.hw_address.cmp(&other.hw_address);
+            }
+        }
+        return Some(ord);
+    }
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
@@ -101,6 +142,19 @@ impl ControlInterface {
         })
     }
 
+    /**
+    Creates a [ControlInterface] by a [DeviceIdentifier].
+    */
+    pub async fn from_device_identifier(
+        device_identifier: DeviceIdentifier,
+    ) -> anyhow::Result<Self> {
+        Ok(ControlInterface::new(
+            device_identifier.ip_address.to_string().as_str(),
+            device_identifier.mac_address.to_string().as_str(),
+        )
+        .await?)
+    }
+
     pub fn get_hw_address(&self) -> String {
         self.hw_address.clone()
     }
@@ -129,14 +183,14 @@ impl ControlInterface {
             return Err(anyhow!("colors set must not be empty"));
         }
 
-        let mut leds = vec![(0, 0, 0); num_leds];
+        let mut leds: Vec<(u8, u8, u8)> = vec![(0, 0, 0); num_leds];
         let mut glow_start_times =
             vec![Instant::now() - (time_to_max_glow + time_to_fade) * 2; num_leds];
         let mut led_colors = vec![
             RGB {
                 red: 0,
                 green: 0,
-                blue: 0
+                blue: 0,
             };
             num_leds
         ]; // Track color for each LED
@@ -203,7 +257,7 @@ impl ControlInterface {
 
             // Send the updated frame to the device
             let flattened_frame = ControlInterface::flatten_rgb_vec(leds.clone());
-            self.set_rt_frame_socket(&socket, &flattened_frame, 3)
+            self.set_rt_frame_socket(&socket, &flattened_frame, HardwareVersion::Version3)
                 .await?;
         }
     }
@@ -215,7 +269,7 @@ impl ControlInterface {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.connect((self.host.as_str(), 7777)).await?;
         loop {
-            self.set_rt_frame_socket(&socket, &flattened_frame, 3)
+            self.set_rt_frame_socket(&socket, &flattened_frame, HardwareVersion::Version3)
                 .await?;
             sleep(Duration::from_millis(100)).await;
         }
@@ -237,7 +291,7 @@ impl ControlInterface {
             let gradient_frame = ControlInterface::flatten_rgb_vec(gradient_frame);
             let socket = UdpSocket::bind("0.0.0.0:0").await?;
             socket.connect((self.host.as_str(), 7777)).await?;
-            self.set_rt_frame_socket(&socket, &gradient_frame, 3)
+            self.set_rt_frame_socket(&socket, &gradient_frame, HardwareVersion::Version3)
                 .await?;
 
             // Increment the offset for the next frame
@@ -256,11 +310,12 @@ impl ControlInterface {
             .flat_map(|(r, g, b)| vec![r, g, b])
             .collect()
     }
+
     pub async fn set_rt_frame_socket(
         &self,
         socket: &UdpSocket,
         frame: &[u8],
-        version: u32,
+        version: HardwareVersion,
     ) -> anyhow::Result<()> {
         // Determine the protocol version from the device configuration
         // let version = self.device_info.fw_version; // Assuming fw_version is a field in DeviceInfoResponse
@@ -273,13 +328,13 @@ impl ControlInterface {
         // Prepare the packet based on the protocol version
         let mut packet = BytesMut::new();
         match version {
-            1 => {
+            HardwareVersion::Version1 => {
                 packet.put_u8(1); // Protocol version 1
                 packet.extend_from_slice(&access_token);
                 packet.put_u8(self.device_info.number_of_led as u8); // Number of LEDs
                 packet.extend_from_slice(frame);
             }
-            2 => {
+            HardwareVersion::Version2 => {
                 packet.put_u8(2); // Protocol version 2
                 packet.extend_from_slice(&access_token);
                 packet.put_u8(0); // Placeholder byte
@@ -319,7 +374,8 @@ impl ControlInterface {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.connect((self.host.as_str(), 7777)).await?;
         // Call the set_rt_frame_socket method to send the frame
-        self.set_rt_frame_socket(&socket, frame, 3).await?;
+        self.set_rt_frame_socket(&socket, frame, HardwareVersion::Version3)
+            .await?;
 
         Ok(())
     }
@@ -692,31 +748,51 @@ impl ControlInterface {
 }
 
 // Define a struct to deserialize the device information response
+#[derive(Derivative)]
+#[derivative(PartialEq)]
 #[derive(Deserialize, Debug)]
 pub struct DeviceInfoResponse {
     pub product_name: String,
     pub hardware_version: String,
     pub bytes_per_led: usize,
     pub hw_id: String,
-    pub flash_size: usize,
+    /// This only attribute which doesn't appear in Twinkly Squares, 2nd generation.
+    pub flash_size: Option<usize>,
     pub led_type: usize,
     pub product_code: String,
     pub fw_family: String,
     pub device_name: String,
+
+    // Ignore uptime for partial-equal, it changes over time, while the device stays the same.
+    #[derivative(PartialEq = "ignore")]
+    // Uptime is now an unsigned 64-bit integer
     #[serde(deserialize_with = "deserialize_duration_millis")]
-    pub uptime: Duration, // Uptime is now an unsigned 64-bit integer
+    pub uptime: Duration,
+
     pub mac: String,
     pub uuid: String,
     pub max_supported_led: usize,
     pub number_of_led: usize,
-    pub led_profile: LedProfile, // LedProfile is now an enum
+    // LedProfile is now an enum
+    pub led_profile: LedProfile,
     pub frame_rate: f64,
+
+    // The measured frame rate will change on the same device.
+    #[derivative(PartialEq = "ignore")]
     pub measured_frame_rate: f64,
+
     pub movie_capacity: usize,
     pub max_movies: usize,
     pub wire_type: usize,
     pub copyright: String,
     pub code: usize,
+}
+
+impl PartialOrd for DeviceInfoResponse {
+    /// Do a partial comparison by comparing their UUIDs.
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.uuid.cmp(&other.uuid))
+    }
 }
 
 fn deserialize_duration_millis<'de, D>(deserializer: D) -> anyhow::Result<Duration, D::Error>
@@ -730,7 +806,7 @@ where
         .map_err(serde::de::Error::custom)
 }
 
-#[derive(Deserialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum LedProfile {
     RGB,

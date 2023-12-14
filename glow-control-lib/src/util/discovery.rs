@@ -40,12 +40,12 @@ impl DiscoveryResponse {
     }
 }
 
-#[derive(Debug, Hash, Eq, PartialEq, Serialize)]
+#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Clone, Serialize)]
 pub struct DeviceIdentifier {
-    ip_address: Ipv4Addr,
-    device_id: String,
-    mac_address: String,
-    device_name: String,
+    pub ip_address: Ipv4Addr,
+    pub device_id: String,
+    pub mac_address: String,
+    pub device_name: String,
 }
 
 impl DeviceIdentifier {
