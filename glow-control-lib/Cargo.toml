@@ -32,3 +32,4 @@ chrono = "0.4"
 bytes = "1.1"
 palette = "0.7"
 derivative = "2.2.0"
+uuid = { version = "1.7.0", features = ["v4"] }

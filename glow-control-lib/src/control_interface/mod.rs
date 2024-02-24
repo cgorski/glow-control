@@ -22,6 +22,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::time::{interval, sleep, Instant};
+use uuid::Uuid;
 
 /// Twinkly hardware version.
 pub enum HardwareVersion {
@@ -140,6 +141,66 @@ impl ControlInterface {
             client,
             device_info,
         })
+    }
+
+    /**
+    Creates a mock / demo [DeviceInfoResponse].
+    A utility function for [Self::new_mock_control_interface].
+     */
+    pub fn new_mock_device_info_response(
+        id: String,
+        device_name: String,
+        mac: String,
+        number_of_led: usize
+    ) -> DeviceInfoResponse {
+        DeviceInfoResponse {
+            product_name: "Twinkly".to_string(),
+            hardware_version: "500".to_string(),
+            bytes_per_led: 3,
+            hw_id: id,
+            flash_size: None,
+            led_type: 36,
+            product_code: "TWQ012STW".to_string(),
+            fw_family: "T".to_string(),
+            device_name,
+            uptime: Default::default(),
+            mac,
+            uuid: Uuid::new_v4().to_string(),
+            max_supported_led: 3904.max(number_of_led),
+            number_of_led,
+            pwr: Some(DevicePower {
+                mA: 3250,
+                mV: 20000,
+            }),
+            led_profile: LedProfile::RGB,
+            frame_rate: 40.0,
+            measured_frame_rate: 12.0,
+            movie_capacity: 2722,
+            max_movies: 55,
+            wire_type: 0,
+            copyright: "Fake Copyright".to_string(),
+            code: 1000,
+        }
+    }
+
+    /**
+    Creates a mock / demo [ControlInterface] with a demo [DeviceInfoResponse].
+    A utility function [Self::new_mock_device_info_response] exists,
+    to easily create a valid [DeviceInfoResponse].
+    */
+    pub fn new_mock_control_interface(
+        host: String,
+        hw_address: String,
+        auth_token: String,
+        device_info: DeviceInfoResponse,
+    ) -> Self {
+        ControlInterface {
+            host,
+            hw_address,
+            auth_token,
+            client: Client::new(),
+            device_info,
+        }
     }
 
     /**
@@ -747,6 +808,27 @@ impl ControlInterface {
     // ... other methods ...
 }
 
+/// Define a struct to deserialize information about the power usage of the device.
+#[derive(Derivative)]
+#[derivative(PartialEq)]
+#[derive(Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct DevicePower {
+    /// Power usage in Milliampere.
+    pub mA: i64,
+
+    /// Power usage in Millivolt.
+    pub mV: i64,
+}
+
+#[allow(non_snake_case)]
+impl DevicePower {
+    /// Power usage in Milliwatt.
+    pub fn mW(&self) -> i64 {
+        (self.mA * self.mV) / 1_000
+    }
+}
+
 // Define a struct to deserialize the device information response
 #[derive(Derivative)]
 #[derivative(PartialEq)]
@@ -773,6 +855,12 @@ pub struct DeviceInfoResponse {
     pub uuid: String,
     pub max_supported_led: usize,
     pub number_of_led: usize,
+
+    /** Ignore power consumption for partial-equal,
+        it changes over time, while the device stays the same. */
+    #[derivative(PartialEq = "ignore")]
+    pub pwr: Option<DevicePower>,
+    
     // LedProfile is now an enum
     pub led_profile: LedProfile,
     pub frame_rate: f64,
