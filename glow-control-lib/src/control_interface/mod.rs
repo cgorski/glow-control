@@ -811,7 +811,7 @@ impl ControlInterface {
 /// Define a struct to deserialize information about the power usage of the device.
 #[derive(Derivative)]
 #[derivative(PartialEq)]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone, Copy)]
 #[allow(non_snake_case)]
 pub struct DevicePower {
     /// Power usage in Milliampere.
@@ -832,7 +832,7 @@ impl DevicePower {
 // Define a struct to deserialize the device information response
 #[derive(Derivative)]
 #[derivative(PartialEq)]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct DeviceInfoResponse {
     pub product_name: String,
     pub hardware_version: String,
