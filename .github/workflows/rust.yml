@@ -28,43 +28,20 @@ jobs:
         uses: actions/setup-rust@v4
         with:
           toolchain: stable
+          components: rustfmt, clippy
 
       - name: Check formatting
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-formatting-${{ hashFiles('**/Cargo.lock') }}
-        env:
-          CARGO_VERBOSE: 1
         run: |
-          cargo fmt --all -- --color=always
+          cargo fmt --all -- --check
 
       - name: Lint with clippy
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-clippy-${{ hashFiles('**/Cargo.lock') }}
-        env:
-          CARGO_VERBOSE: 1
         run: |
           cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
-        env:
-          CARGO_VERBOSE: 1
         run: |
-          cargo build --all --verbose
+          cargo build --verbose
 
       - name: Run tests
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-tests-${{ hashFiles('**/Cargo.lock') }}
-        env:
-          CARGO_VERBOSE: 1
         run: |
-          cargo test --all --verbose
+          cargo test --verbose
