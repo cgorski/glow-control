@@ -25,32 +25,46 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions/setup-rust@v4
         with:
-          profile: minimal
           toolchain: stable
-          override: true
 
       - name: Check formatting
-        uses: actions-rs/cargo@v1
+        uses: actions/cache@v4
         with:
-          command: fmt
-          args: -- --check
+          path: target
+          key: ${{ runner.os }}-formatting-${{ hashFiles('**/Cargo.lock') }}
+        env:
+          CARGO_VERBOSE: 1
+        run: |
+          cargo fmt --all -- --color=always
 
       - name: Lint with clippy
-        uses: actions-rs/cargo@v1
+        uses: actions/cache@v4
         with:
-          command: clippy
-          args: --all-targets --all-features -- -D warnings
+          path: target
+          key: ${{ runner.os }}-clippy-${{ hashFiles('**/Cargo.lock') }}
+        env:
+          CARGO_VERBOSE: 1
+        run: |
+          cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Build
-        uses: actions-rs/cargo@v1
+        uses: actions/cache@v4
         with:
-          command: build
-          args: --all --verbose
+          path: target
+          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
+        env:
+          CARGO_VERBOSE: 1
+        run: |
+          cargo build --all --verbose
 
       - name: Run tests
-        uses: actions-rs/cargo@v1
+        uses: actions/cache@v4
         with:
-          command: test
-          args: --all --verbose
+          path: target
+          key: ${{ runner.os }}-tests-${{ hashFiles('**/Cargo.lock') }}
+        env:
+          CARGO_VERBOSE: 1
+        run: |
+          cargo test --all --verbose
