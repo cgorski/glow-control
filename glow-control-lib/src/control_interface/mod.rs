@@ -10,7 +10,7 @@ use palette::{FromColor, Hsl, IntoColor, Srgb};
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::thread_rng;
 use reqwest::{Client, StatusCode};
-use serde::de::Error;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
 use std::collections::HashSet;

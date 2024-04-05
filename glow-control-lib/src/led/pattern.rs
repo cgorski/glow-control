@@ -94,7 +94,7 @@ impl Pattern {
 
     pub fn sprinkle_pattern(
         &self,
-        pat: &mut Vec<(u8, u8, u8)>,
+        pat: &mut [(u8, u8, u8)],
         rgblst: &[(u8, u8, u8)],
         freq: f64,
     ) -> Result<()> {
