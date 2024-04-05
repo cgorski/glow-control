@@ -25,10 +25,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install Rust toolchain
-        uses: actions/setup-rust@v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
+        run: |
+          rustup update --no-self-update stable
+          rustup component add --toolchain stable rustfmt rust-src
+          rustup default stable
 
       - name: Check formatting
         run: |
