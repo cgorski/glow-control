@@ -1,12 +1,16 @@
 ![Build Status](https://github.com/cgorski/glow-control/actions/workflows/rust.yml/badge.svg?branch=main)
 [![Crates.io](https://img.shields.io/crates/v/glow-control-lib.svg)](https://crates.io/crates/glow-control-lib)
 
-
 # Glow Control Library for Twinkly LEDs
 
-The `glow-control-lib` crate is a Rust library designed to interface with Twinkly LED devices. It provides a comprehensive set of APIs that facilitate the discovery of devices, manipulation of device modes, control of real-time lighting effects, and more. This library serves as the backbone for the `glow-control` CLI and can be used to build custom applications that manage Twinkly LED lights.
+The `glow-control-lib` crate is a Rust library designed to interface with Twinkly LED devices. It provides a
+comprehensive set of APIs that facilitate the discovery of devices, manipulation of device modes, control of real-time
+lighting effects, and more. This library serves as the backbone for the `glow-control` CLI and can be used to build
+custom applications that manage Twinkly LED lights.
 
-This project draws inspiration from the Python libraries [xled](https://github.com/scrool/xled) and [xled_plus](https://github.com/Anders-Holst/xled_plus), and it is intended to be an open-source alternative for the Rust ecosystem.
+This project draws inspiration from the Python libraries [xled](https://github.com/scrool/xled)
+and [xled_plus](https://github.com/Anders-Holst/xled_plus), and it is intended to be an open-source alternative for the
+Rust ecosystem.
 
 ## Features
 
@@ -15,7 +19,7 @@ This project draws inspiration from the Python libraries [xled](https://github.c
 - Real-time effect control and custom LED movie uploads
 - Utility functions for device authentication and communication
 
-## Usage
+## Library Usage
 
 To include this library in your Rust project, add the following to your `Cargo.toml`:
 
@@ -39,14 +43,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 For more examples and detailed API documentation, run `cargo doc --open` after adding the library to your project.
 
+## CLI Usage
+
+To install the CLI, either run `cargo install glow-control`, run it via `cargo run -- <args>`, or build it from
+the `glow-control` directory using `cargo build --release`.
+
+## Initial Use
+
+To get started, make sure your lights have been configured on your local network using the official Twinkly app, and
+that you have used the app to generate a 3D point cloud. This point cloud will be stored on your individual Twinkly
+devices by the official app, so after initial configuration, you no longer need the app to use `glow-control`.
+
+## Discover Feature
+
+The `glow-control` CLI provides a `discover` subcommand that allows you to scan your network for Twinkly devices. You
+can use this feature to find the IP and MAC addresses of your devices, which are required for other CLI commands.
+
+To use the `discover` feature, run the following command:
+
+The discovery search time is 5000ms by default. You can adjust it if needed.
+
+```
+glow-control discover
+```
+
+```
+IP Address    Device ID        MAC Address         Device Name
+-----------   --------------   -----------------   -------  
+10.10.0.42    Twinkly_C54ABC   11:38:aa:c4:aa:55   Living Room  
+10.10.0.37    Twinkly_C5CDEF   bb:e5:7c:dd:bb:57   Kitchen    
+```
+
+You can also specify the output format using the `--output` option. Supported formats are:
+
+- `plaintext` (default)
+- `json`
+- `yaml`
+
+For example, to get the results in JSON format:
+
+```
+glow-control discover --output json
+```
+
 ## License
 
-This library is dual-licensed under the MIT License and the Apache License, Version 2.0, allowing you to choose the license that best fits your project's needs. The full text of the licenses can be found in the `LICENSE-MIT` and `LICENSE-APACHE` files.
+This library is dual-licensed under the MIT License and the Apache License, Version 2.0, allowing you to choose the
+license that best fits your project's needs. The full text of the licenses can be found in the `LICENSE-MIT`
+and `LICENSE-APACHE` files.
 
 ## Disclaimer
 
-This project is not affiliated with, authorized by, endorsed by, or in any way officially connected with Twinkly or its affiliates. The official Twinkly website can be found at [https://www.twinkly.com](https://www.twinkly.com).
+This project is not affiliated with, authorized by, endorsed by, or in any way officially connected with Twinkly or its
+affiliates. The official Twinkly website can be found at [https://www.twinkly.com](https://www.twinkly.com).
 
 ## Contributions
 
-Contributions are welcome! If you would like to contribute to this library, please feel free to open an issue or create a pull request with your improvements or suggestions.
+Contributions are welcome! If you would like to contribute to this library, please feel free to open an issue or create
+a pull request with your improvements or suggestions.
+
+
