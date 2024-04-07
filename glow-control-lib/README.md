@@ -16,7 +16,8 @@ Rust ecosystem.
 
 - Network-based discovery of Twinkly devices
 - High-level control interfaces for managing device modes and settings
-- Real-time effect control and custom LED movie uploads
+- Real-time effect control from an external network device
+- Custom LED movie uploads
 - Utility functions for device authentication and communication
 
 ## Library Usage
@@ -48,13 +49,13 @@ For more examples and detailed API documentation, run `cargo doc --open` after a
 To install the CLI, either run `cargo install glow-control`, run it via `cargo run -- <args>`, or build it from
 the `glow-control` directory using `cargo build --release`.
 
-## Initial Use
+### Initial Use
 
 To get started, make sure your lights have been configured on your local network using the official Twinkly app, and
 that you have used the app to generate a 3D point cloud. This point cloud will be stored on your individual Twinkly
 devices by the official app, so after initial configuration, you no longer need the app to use `glow-control`.
 
-## Discover Feature
+### Discover Feature
 
 The `glow-control` CLI provides a `discover` subcommand that allows you to scan your network for Twinkly devices. You
 can use this feature to find the IP and MAC addresses of your devices, which are required for other CLI commands.
@@ -85,6 +86,21 @@ For example, to get the results in JSON format:
 ```
 glow-control discover --output json
 ```
+
+### Running the Real-Time Test Colors
+
+To run the real-time test colors, use the `real-time-test` subcommand under the `device-call` command. This will display
+a rotating color pattern on Twinkly device.
+
+```bash
+glow-control device-call --ip <ip-address> --mac <mac-address> real-time-test
+```
+
+`<ip-address>` and `<mac-address>` are the IP and MAC addresses of your Twinkly device, respectively. They must be
+specified for all device-specific commands.
+
+The real-time test inputs frames directly from the CLI binary. Once you terminate the program, the Twinkly device will
+eventually timeout and return to its previous state.
 
 ## License
 
