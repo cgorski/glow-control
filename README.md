@@ -26,18 +26,31 @@ To include this library in your Rust project, add the following to your `Cargo.t
 
 ```toml
 [dependencies]
-glow-control-lib = { version = "0.3.2", path = "../glow-control-lib" }
+glow-control-lib = { version = "0.3.4", path = "../glow-control-lib" }
 ```
 
-Here's a simple example of how to use the library to set a Twinkly device to a specific mode:
+Here's a simple example of how to use the library to set Twinkly devices to a specific mode:
 
 ```rust
+use std::collections::HashSet;
+use std::time::Duration;
 use glow_control_lib::control_interface::{ControlInterface, DeviceMode};
+use glow_control_lib::util::discovery::{DeviceIdentifier, Discovery};
+use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let control = ControlInterface::new("192.168.1.100", "AA:BB:CC:DD:EE:FF").await?;
-    control.set_mode(DeviceMode::Color).await?;
+    // Discover devices with a 5-second timeout
+    let devices: HashSet<DeviceIdentifier> = Discovery::find_devices(Duration::from_secs(5)).await?;
+
+    // Iterate over the discovered devices, print their details and set their mode
+    for device in devices {
+        println!("\n{} Found device {}\n{:?}\n", "=".repeat(30), "=".repeat(30), device);
+
+        let control = ControlInterface::from_device_identifier(device).await?;
+        control.set_mode(DeviceMode::Color).await?;
+    }
+
     Ok(())
 }
 ```
