@@ -857,7 +857,7 @@ pub struct DeviceInfoResponse {
     pub number_of_led: usize,
 
     /** Ignore power consumption for partial-equal,
-        it changes over time, while the device stays the same. */
+        it may change over time, while the device stays the same. */
     #[derivative(PartialEq = "ignore")]
     pub pwr: Option<DevicePower>,
     
