@@ -4,5 +4,3 @@ members = [
     "glow-control",
 ]
 resolver = "2"
-
-
