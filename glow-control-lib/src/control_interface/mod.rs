@@ -68,7 +68,7 @@ impl PartialOrd for ControlInterface {
                 ord = self.hw_address.cmp(&other.hw_address);
             }
         }
-        return Some(ord);
+        Some(ord)
     }
 }
 
@@ -151,7 +151,7 @@ impl ControlInterface {
         id: String,
         device_name: String,
         mac: String,
-        number_of_led: usize
+        number_of_led: usize,
     ) -> DeviceInfoResponse {
         DeviceInfoResponse {
             product_name: "Twinkly".to_string(),
@@ -209,11 +209,11 @@ impl ControlInterface {
     pub async fn from_device_identifier(
         device_identifier: DeviceIdentifier,
     ) -> anyhow::Result<Self> {
-        Ok(ControlInterface::new(
+        ControlInterface::new(
             device_identifier.ip_address.to_string().as_str(),
             device_identifier.mac_address.to_string().as_str(),
         )
-        .await?)
+        .await
     }
 
     pub fn get_hw_address(&self) -> String {
@@ -857,10 +857,10 @@ pub struct DeviceInfoResponse {
     pub number_of_led: usize,
 
     /** Ignore power consumption for partial-equal,
-        it may change over time, while the device stays the same. */
+    it may change over time, while the device stays the same. */
     #[derivative(PartialEq = "ignore")]
     pub pwr: Option<DevicePower>,
-    
+
     // LedProfile is now an enum
     pub led_profile: LedProfile,
     pub frame_rate: f64,
