@@ -1,5 +1,10 @@
 ![Build Status](https://github.com/cgorski/glow-control/actions/workflows/rust.yml/badge.svg?branch=main)
+
 [![Crates.io](https://img.shields.io/crates/v/glow-control-lib.svg)](https://crates.io/crates/glow-control-lib)
+`Library`
+
+[![Crates.io](https://img.shields.io/crates/v/glow-control.svg)](https://crates.io/crates/glow-control)
+`CLI`
 
 # Glow Control Library for Twinkly LEDs
 
