@@ -98,3 +98,5 @@ pub mod led;
 // }
 // ```
 pub mod util;
+
+pub mod input_stream;

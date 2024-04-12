@@ -1,13 +1,16 @@
+use std::cmp::max;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
+use std::net::Ipv4Addr;
+use std::time::Duration;
 
 use anyhow::Context;
 use log::info;
 use serde::{Deserialize, Serialize};
-use std::net::Ipv4Addr;
-use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::time::{timeout, Instant};
+
+use crate::control_interface::ControlInterface;
 
 const PING_MESSAGE: &[u8] = b"\x01discover";
 const BROADCAST_ADDRESS: &str = "255.255.255.255:5555";
@@ -46,6 +49,7 @@ pub struct DeviceIdentifier {
     pub device_id: String,
     pub mac_address: String,
     pub device_name: String,
+    pub led_count: u16,
 }
 
 impl DeviceIdentifier {
@@ -54,12 +58,14 @@ impl DeviceIdentifier {
         device_id: String,
         mac_address: String,
         device_name: String,
+        led_count: u16,
     ) -> Self {
         DeviceIdentifier {
             ip_address,
             device_id,
             mac_address,
             device_name,
+            led_count,
         }
     }
 }
@@ -124,11 +130,20 @@ impl Discovery {
                         match Self::fetch_gestalt_info(discovery_response.ip_address).await {
                             Ok(gestalt_info) => {
                                 info!("MAC address: {}", gestalt_info);
+                                // Fetch the LED count from a high control interface
+                                let high_control_interface = ControlInterface::new(
+                                    &discovery_response.ip_address.to_string(),
+                                    &gestalt_info.mac,
+                                )
+                                .await?;
+                                let led_count =
+                                    high_control_interface.get_device_info().number_of_led as u16;
                                 let device = DeviceIdentifier::new(
                                     discovery_response.ip_address,
                                     discovery_response.device_id,
                                     gestalt_info.mac,
                                     gestalt_info.device_name,
+                                    led_count,
                                 );
                                 discovered_devices.insert(device);
                             }
@@ -186,48 +201,60 @@ impl Discovery {
             .unwrap_or(0);
         let max_device_name_width = devices
             .iter()
-            .map(|d| d.device_name.len())
+            .map(|d| max(d.device_name.len(), 20))
+            .max()
+            .unwrap_or(0);
+
+        let max_led_count_width = devices
+            .iter()
+            .map(|d| d.led_count.to_string().len())
             .max()
             .unwrap_or(0);
 
         // Print the header with appropriate spacing
         println!(
-            "{:<ip_width$} {:<device_id_width$} {:<mac_width$} {:<device_name_width$}",
+            "{:<ip_width$} {:<device_id_width$} {:<mac_width$} {:<device_name_width$} {:<led_count_width$}",
             "IP Address",
             "Device ID",
             "MAC Address",
             "Device Name",
+            "LED Count",
             ip_width = max_ip_width + 2, // Add some padding
             device_id_width = max_device_id_width + 2,
             mac_width = max_mac_width + 2,
             device_name_width = max_device_name_width + 2,
+            led_count_width = max_led_count_width + 2,
         );
 
         // Print the separator line
         println!(
-            "{:<ip_width$} {:<device_id_width$} {:<mac_width$} {:<device_name_width$}",
+            "{:<ip_width$} {:<device_id_width$} {:<mac_width$} {:<device_name_width$} {:<led_count_width$}",
             "-".repeat(max_ip_width),
             "-".repeat(max_device_id_width),
             "-".repeat(max_mac_width),
             "-".repeat(max_device_name_width),
+            "-".repeat(max_led_count_width),
             ip_width = max_ip_width + 2,
             device_id_width = max_device_id_width + 2,
             mac_width = max_mac_width + 2,
             device_name_width = max_device_name_width + 2,
+            led_count_width = max_led_count_width + 2,
         );
 
         // Print each device entry with appropriate spacing
         for device in devices {
             println!(
-                "{:<ip_width$} {:<device_id_width$} {:<mac_width$} {:<device_name_width$}",
+                "{:<ip_width$} {:<device_id_width$} {:<mac_width$} {:<device_name_width$} {:<led_count_width$}",
                 device.ip_address,
                 device.device_id,
                 device.mac_address,
                 device.device_name,
+                device.led_count,
                 ip_width = max_ip_width + 2,
                 device_id_width = max_device_id_width + 2,
                 mac_width = max_mac_width + 2,
                 device_name_width = max_device_name_width + 2,
+                led_count_width = max_led_count_width + 2,
             );
         }
     }

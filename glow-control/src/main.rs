@@ -1,12 +1,13 @@
 use std::collections::HashSet;
 
-use anyhow::{anyhow, Result};
-
-use clap::{Parser, Subcommand, ValueEnum};
-
-use glow_control_lib::control_interface::{CliColors, CliDeviceMode, ControlInterface, RGB};
 use std::time::Duration;
 
+use anyhow::{anyhow, Result};
+use clap::{Parser, Subcommand, ValueEnum};
+
+use glow_control_lib::control_interface::{
+    CliColors, CliDeviceMode, ControlInterface, RtStdinErrorMode, RtStdinFormat, RGB,
+};
 use glow_control_lib::util::discovery::Discovery;
 
 // Function to generate a random challenge
@@ -123,6 +124,7 @@ pub enum RtEffect {
         frame_rate: f64,
     },
 }
+
 fn parse_duration(s: &str) -> Result<Duration, &'static str> {
     let millis = s
         .parse::<u64>()
@@ -170,6 +172,24 @@ pub enum DeviceAction {
     RtEffect {
         #[clap(subcommand)]
         effect: RtEffect,
+    },
+    #[clap(name = "rt-stdin")]
+    RtStdin {
+        /// The format of the input stream
+        #[clap(long, value_enum)]
+        format: RtStdinFormat,
+
+        /// The error mode for the input stream
+        #[clap(long, value_enum)]
+        error_mode: RtStdinErrorMode,
+
+        /// LEDs to read before writing to the device
+        #[clap(long, value_enum)]
+        leds_per_frame: u16,
+
+        /// Minimum time between frames in milliseconds
+        #[clap(long, value_parser = parse_duration)]
+        min_frame_duration: Duration,
     },
 }
 
@@ -294,6 +314,21 @@ async fn handle_cli(cli: Cli) -> Result<()> {
                             println!("Shine effect started.");
                         }
                     }
+                }
+                DeviceAction::RtStdin {
+                    format,
+                    error_mode,
+                    leds_per_frame,
+                    min_frame_duration: min_frame_time,
+                } => {
+                    high_control_interface
+                        .show_real_time_stdin_stream(
+                            format,
+                            error_mode,
+                            leds_per_frame,
+                            min_frame_time,
+                        )
+                        .await?;
                 }
             }
         }
