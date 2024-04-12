@@ -1,7 +1,12 @@
-use crate::util::auth::Auth;
-use crate::util::discovery::DeviceIdentifier;
-use crate::util::movie::Movie;
-use anyhow::{anyhow, Context};
+use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::fmt;
+use std::io::{BufReader, Read};
+use std::path::Path;
+use std::str::FromStr;
+use std::time::Duration;
+
+use anyhow::{anyhow, bail, Context};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use bytes::{BufMut, BytesMut};
@@ -14,15 +19,13 @@ use rand::thread_rng;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
-use std::cmp::Ordering;
-use std::collections::HashSet;
-use std::fmt;
-use std::path::Path;
-use std::str::FromStr;
-use std::time::Duration;
 use tokio::net::UdpSocket;
 use tokio::time::{interval, sleep, Instant};
 use uuid::Uuid;
+
+use crate::util::auth::Auth;
+use crate::util::discovery::DeviceIdentifier;
+use crate::util::movie::Movie;
 
 /// Twinkly hardware version.
 pub enum HardwareVersion {
@@ -334,6 +337,84 @@ impl ControlInterface {
                 .await?;
             sleep(Duration::from_millis(100)).await;
         }
+    }
+
+    pub async fn show_real_time_stdin_stream(
+        &self,
+        format: RtStdinFormat,
+        error_mode: RtStdinErrorMode,
+        leds_per_frame: u16,
+        min_frame_time: Duration,
+    ) -> anyhow::Result<()> {
+        let stream = std::io::stdin();
+        let mut reader = BufReader::new(stream);
+        // number of LEDs
+        let mut current_frame = vec![(0, 0, 0); self.device_info.number_of_led];
+        self.set_mode(DeviceMode::RealTime).await?;
+        loop {
+            let mut leds_read: Vec<AddressableLed> = Vec::new();
+            let mut time_at_last_frame = Instant::now();
+            loop {
+                let mut led = match format {
+                    RtStdinFormat::Binary => {
+                        self.show_real_time_stdin_stream_binary(&mut reader).await?
+                    } // RtStdinFormat::Ascii => process_ascii_stream(reader)?,
+                      // RtStdinFormat::JsonLines => process_json_lines_stream(reader)?,
+                };
+                match error_mode {
+                    RtStdinErrorMode::IgnoreInvalidAddress => {}
+                    RtStdinErrorMode::ModInvalidAddress => {
+                        led.address %= self.device_info.number_of_led as u16;
+                    }
+                    RtStdinErrorMode::StopInvalidAddress => {
+                        if led.address >= self.device_info.number_of_led as u16 {
+                            bail!("Invalid LED address: {:?}", led);
+                        }
+                    }
+                }
+                println!("LED: {:?}", led);
+                leds_read.push(led);
+
+                AddressableLed::merge_frame_array(&leds_read, &mut current_frame);
+                if leds_read.len() == leds_per_frame as usize {
+                    break;
+                }
+            }
+            let current_time = Instant::now();
+            let time_since_last_frame = current_time - time_at_last_frame;
+            // sleep for the remaining time
+            if time_since_last_frame < min_frame_time {
+                sleep(min_frame_time - time_since_last_frame).await;
+            }
+
+            let network_frame = ControlInterface::flatten_rgb_vec(current_frame.clone().to_vec());
+            let socket = UdpSocket::bind("0.0.0.0:0").await?;
+            socket.connect((self.host.as_str(), 7777)).await?;
+            self.set_rt_frame_socket(&socket, &network_frame, HardwareVersion::Version3)
+                .await?;
+        }
+    }
+
+    async fn show_real_time_stdin_stream_binary(
+        &self,
+        reader: &mut BufReader<impl Read>,
+    ) -> anyhow::Result<AddressableLed> {
+        let mut buffer = [0; 5];
+        reader.read_exact(&mut buffer)?;
+
+        let led_address = u16::from_be_bytes([buffer[0], buffer[1]]);
+        let red = buffer[2];
+        let green = buffer[3];
+        let blue = buffer[4];
+        let data = BinaryStreamFormat {
+            led_address,
+            red,
+            green,
+            blue,
+        };
+        let led: AddressableLed = data.into();
+
+        Ok(led)
     }
 
     pub async fn show_real_time_test_color_wheel(
@@ -968,6 +1049,23 @@ pub struct RGB {
     pub blue: u8,
 }
 
+// implement From for (u8,u8,u8) to RGB and vice verse
+impl From<(u8, u8, u8)> for RGB {
+    fn from(tuple: (u8, u8, u8)) -> Self {
+        RGB {
+            red: tuple.0,
+            green: tuple.1,
+            blue: tuple.2,
+        }
+    }
+}
+
+impl From<RGB> for (u8, u8, u8) {
+    fn from(rgb: RGB) -> Self {
+        (rgb.red, rgb.green, rgb.blue)
+    }
+}
+
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum CliColors {
     Red,
@@ -1290,4 +1388,55 @@ async fn send_challenge(
         serde_json::from_str(&content).context("Failed to deserialize challenge response")?;
 
     Ok(challenge_response)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum RtStdinFormat {
+    Binary,
+    //  Ascii,
+    //  JsonLines,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum RtStdinErrorMode {
+    IgnoreInvalidAddress,
+    ModInvalidAddress,
+    StopInvalidAddress,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct BinaryStreamFormat {
+    pub led_address: u16,
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AddressableLed {
+    pub address: u16,
+    pub color: RGB,
+}
+
+impl AddressableLed {
+    pub fn merge_frame_array(new_values: &Vec<AddressableLed>, old_frame: &mut [(u8, u8, u8)]) {
+        for led in new_values {
+            let (r, g, b) = led.color.into();
+            old_frame[led.address as usize] = (r, g, b);
+        }
+    }
+}
+
+// device AddressableLed from BinaryStreamFormat
+impl From<BinaryStreamFormat> for AddressableLed {
+    fn from(data: BinaryStreamFormat) -> Self {
+        AddressableLed {
+            address: data.led_address,
+            color: RGB {
+                red: data.red,
+                green: data.green,
+                blue: data.blue,
+            },
+        }
+    }
 }
