@@ -353,7 +353,7 @@ impl ControlInterface {
         self.set_mode(DeviceMode::RealTime).await?;
         loop {
             let mut leds_read: Vec<AddressableLed> = Vec::new();
-            let mut time_at_last_frame = Instant::now();
+            let time_at_last_frame = Instant::now();
             loop {
                 let mut led = match format {
                     RtStdinFormat::Binary => {
