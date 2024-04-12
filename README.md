@@ -11,7 +11,7 @@
 The `glow-control-lib` crate is a Rust library designed to interface with Twinkly LED devices. It provides a
 comprehensive set of APIs that facilitate the discovery of devices, manipulation of device modes, control of real-time
 lighting effects, and more. This library serves as the backbone for the `glow-control` CLI and can be used to build
-custom applications that manage Twinkly LED lights.
+custom applications that manage Twinkly LED controllers.
 
 This project draws inspiration from the Python libraries [xled](https://github.com/scrool/xled)
 and [xled_plus](https://github.com/Anders-Holst/xled_plus), and it is intended to be an open-source alternative for the
