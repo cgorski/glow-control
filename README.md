@@ -20,6 +20,7 @@ Rust ecosystem.
 ## Features
 
 - Network-based discovery of Twinkly devices
+- Easy integration with any app that can pipe output to the CLI
 - High-level control interfaces for managing device modes and settings
 - Real-time effect control from an external network device
 - Custom LED movie uploads
@@ -98,10 +99,10 @@ glow-control discover
 ```
 
 ```
-IP Address    Device ID        MAC Address         Device Name
------------   --------------   -----------------   -------  
-10.10.0.42    Twinkly_C54ABC   11:38:aa:c4:aa:55   Living Room  
-10.10.0.37    Twinkly_C5CDEF   bb:e5:7c:dd:bb:57   Kitchen    
+IP Address    Device ID        MAC Address         Device Name   LED Count
+-----------   --------------   -----------------   -----------   ---------
+10.10.0.42    Twinkly_C54ABC   11:38:aa:c4:aa:55   Living Room   250
+10.10.0.37    Twinkly_C5CDEF   bb:e5:7c:dd:bb:57   Kitchen       600
 ```
 
 You can also specify the output format using the `--output` option. Supported formats are:
@@ -130,6 +131,13 @@ specified for all device-specific commands.
 
 The real-time test inputs frames directly from the CLI binary. Once you terminate the program, the Twinkly device will
 eventually timeout and return to its previous state.
+
+### Demonstrating External App Integration
+
+Integration with other applications is possible by piping the output of another program to the CLI.
+For example, to display random, changing colors on a device:
+
+```cat /dev/random| cargo run -- device-call --ip 10.10.0.37 --mac bb:e5:7c:dd:bb:57 rt-stdin --format binary --error-mode mod-invalid-address --leds-per-frame 5 --min-frame-duration 100```
 
 ### Other Examples
 

@@ -545,7 +545,7 @@ impl ControlInterface {
             ));
         }
         let response = response.text().await?;
-        println!("Response: {}", response);
+        // println!("Response: {}", response);
         let device_info: DeviceInfoResponse = serde_json::from_str(&response)?;
         // let device_info = response
         //     .json::<DeviceInfoResponse>()
@@ -1236,7 +1236,7 @@ async fn send_verify(
                 .await
                 .context("Failed to deserialize verify response")?;
             if verify_response.code == 1000 {
-                println!("Verify response code is 1000");
+                //   println!("Verify response code is 1000");
                 Ok(())
             } else {
                 Err(anyhow::anyhow!(
@@ -1381,9 +1381,9 @@ async fn send_challenge(
         );
     }
 
-    println!("Challenge response: {:?}", response);
+    // println!("Challenge response: {:?}", response);
     let content = response.text().await?;
-    println!("Challenge response content: {:?}", content);
+    // println!("Challenge response content: {:?}", content);
     let challenge_response: ChallengeResponse =
         serde_json::from_str(&content).context("Failed to deserialize challenge response")?;
 
