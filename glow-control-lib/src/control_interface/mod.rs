@@ -37,7 +37,7 @@ pub enum HardwareVersion {
     Version3,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ControlInterface {
     pub host: String,
     hw_address: String,
@@ -147,6 +147,15 @@ impl ControlInterface {
             client,
             device_info,
         })
+    }
+
+    pub async fn reauthenticate(&mut self) -> bool {
+        if let Ok(result) = ControlInterface::authenticate(&self.client, &self.host, &self.hw_address).await {
+            self.auth_token = result;
+            true
+        } else {
+            false
+        }
     }
 
     /**
