@@ -17,6 +17,7 @@ use glow_effects::effects::shine::Shine;
 use glow_effects::util::color_point::{ColorPointContainer, RgbPoint};
 use glow_effects::util::effect::Effect;
 use glow_effects::util::point::Point;
+use log::debug;
 use palette::{FromColor, Hsl, IntoColor, Srgb};
 
 use reqwest::{Client, StatusCode};
@@ -451,12 +452,18 @@ impl ControlInterface {
             .collect()
     }
 
+    /**
+    Set realtime frame with a provided socket.
+
+    # Return
+    Returns either the written bytes or an error.
+     */
     pub async fn set_rt_frame_socket(
         &self,
         socket: &UdpSocket,
         frame: &[u8],
         version: HardwareVersion,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<usize> {
         // Determine the protocol version from the device configuration
         // let version = self.device_info.fw_version; // Assuming fw_version is a field in DeviceInfoResponse
 
@@ -483,6 +490,7 @@ impl ControlInterface {
             _ => {
                 // Protocol version 3 or higher
                 let packet_size = 900;
+                let mut written_bytes = 0;
                 for (i, chunk) in frame.chunks(packet_size).enumerate() {
                     packet.clear();
                     packet.put_u8(3); // Protocol version 3
@@ -490,16 +498,22 @@ impl ControlInterface {
                     packet.put_u16(0); // Placeholder bytes
                     packet.put_u8(i as u8); // Frame index
                     packet.extend_from_slice(chunk);
-                    socket.send(&packet).await?;
+                    let send_result: std::io::Result<usize> = socket.send(&packet).await;
+
+                    if let Ok(send_result) = send_result {
+                        written_bytes += send_result;
+                    } else if let Some(err) = send_result.err() {
+                        let err_string = format!("Failed to send frame {}: {:?}", i, err);
+                        debug!("{}", err_string);
+                        return Err(anyhow!(err_string));
+                    }
                 }
-                return Ok(()); // Early return for version 3
+                return Ok(written_bytes); // Early return for version 3
             }
         }
 
         // Send the packet for versions 1 and 2
-        socket.send(&packet).await?;
-
-        Ok(())
+        return socket.send(&packet).await.map_err(|err| anyhow!(err));
     }
     pub async fn show_rt_frame(&self, frame: &[u8]) -> anyhow::Result<()> {
         // Fetch the current mode from the device
