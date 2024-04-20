@@ -50,12 +50,14 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    let uploaded_files_lock = uploaded_files.lock().unwrap();
+    let objects_to_remove: HashSet<_> = {
+        let uploaded_files_lock = uploaded_files.lock().unwrap();
 
-    let objects_to_remove: HashSet<_> = existing_objects
-        .difference(&*uploaded_files_lock) // Use deref (*) to get the HashSet from the MutexGuard.
-        .cloned()
-        .collect();
+        existing_objects
+            .difference(&*uploaded_files_lock) // Use deref (*) to get the HashSet from the MutexGuard.
+            .cloned()
+            .collect()
+    };
 
     // Remove objects that weren't uploaded in this run
     if !objects_to_remove.is_empty() {
@@ -165,9 +167,7 @@ fn upload_directory(
 }
 
 fn remove_base_path(base_path: &Path, path: &Path) -> PathBuf {
-    path.strip_prefix(base_path)
-        .unwrap_or_else(|_| path)
-        .to_path_buf()
+    path.strip_prefix(base_path).unwrap_or(path).to_path_buf()
 }
 async fn upload_file(
     client: &Client,
@@ -176,7 +176,7 @@ async fn upload_file(
     bucket_name: &str,
     uploaded_files: Arc<Mutex<HashSet<String>>>,
 ) -> Result<()> {
-    let file_name = file_path.to_str().unwrap().replace("\\", "/");
+    let file_name = file_path.to_str().unwrap().replace('\\', "/");
     let s3_key = remove_base_path(base_path, file_path);
     let s3_key = s3_key.to_str().unwrap();
 
