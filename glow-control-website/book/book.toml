@@ -1,0 +1,8 @@
+[book]
+authors = ["Chris Gorski"]
+language = "en"
+multilingual = false
+src = "src"
+title = "The glow-control book"
+description = "A comprehensive guide to using the glow-control and glow-control-lib crates for Twinkly LED device management."
+

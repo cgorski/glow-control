@@ -19,6 +19,23 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Install mdbook
+        run: |
+          cargo install mdbook
+
+      - name: Build Book
+        run: |
+          cd glow-control-website/book
+          mdbook build
+
+      - name: Copy Book to Website
+        run: |
+          cp -r book glow-control-website/website
+
+      - name: Change directory to website
+        run: |
+          cd ..
+
       - name: Build and Run Project
         run: |
           cd glow-control-website
