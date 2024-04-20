@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
 
 use anyhow::{anyhow, Result};
 use aws_config::BehaviorVersion;
 use aws_sdk_s3 as s3;
-use aws_sdk_s3::types::{Delete, ObjectCannedAcl, ObjectIdentifier};
+use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 use futures::future::{BoxFuture, FutureExt};
 use mime_guess::from_path;
 use s3::Client;
@@ -34,10 +34,17 @@ async fn main() -> Result<()> {
     // Initialize an empty HashSet to track uploaded files
     let uploaded_files = Arc::new(Mutex::new(HashSet::new()));
 
+    // Get full path of the website directory
+    let directory = std::fs::canonicalize(directory)?;
+
+    // Change working directory to the website directory
+    std::env::set_current_dir(directory.clone())?;
+
     // Upload directory and track uploaded files
     upload_directory(
         client.clone(),
-        directory.to_string(),
+        directory.clone(),
+        directory,
         bucket_name.to_string(),
         uploaded_files.clone(),
     )
@@ -74,6 +81,7 @@ async fn list_objects(client: &Client, bucket_name: &str) -> Result<HashSet<Stri
 
         for object in resp.contents.unwrap_or_default() {
             if let Some(key) = object.key {
+                println!("Found object: {}", key);
                 objects_set.insert(key);
             }
         }
@@ -93,6 +101,7 @@ async fn delete_objects(
         .collect();
 
     if !objects.is_empty() {
+        println!("Deleting objects: {:#?}", objects);
         client
             .delete_objects()
             .bucket(bucket_name)
@@ -108,9 +117,11 @@ async fn delete_objects(
 
     Ok(())
 }
+
 fn upload_directory(
     client: Client,
-    directory: String,
+    base_path: PathBuf,
+    directory: PathBuf,
     bucket_name: String,
     uploaded_files: Arc<Mutex<HashSet<String>>>,
 ) -> BoxFuture<'static, Result<()>> {
@@ -130,13 +141,21 @@ fn upload_directory(
             if path.is_dir() {
                 upload_directory(
                     client.clone(),
-                    path.to_str().unwrap().to_string(),
+                    base_path.clone(),
+                    path.clone(),
                     bucket_name.clone(),
                     uploaded_files.clone(),
                 )
                 .await?;
             } else {
-                upload_file(&client, &path, &bucket_name, uploaded_files.clone()).await?;
+                upload_file(
+                    &client,
+                    &base_path,
+                    &path,
+                    &bucket_name,
+                    uploaded_files.clone(),
+                )
+                .await?;
             }
         }
 
@@ -144,30 +163,39 @@ fn upload_directory(
     }
     .boxed()
 }
+
+fn remove_base_path(base_path: &Path, path: &Path) -> PathBuf {
+    path.strip_prefix(base_path)
+        .unwrap_or_else(|_| path)
+        .to_path_buf()
+}
 async fn upload_file(
     client: &Client,
+    base_path: &Path,
     file_path: &Path,
     bucket_name: &str,
     uploaded_files: Arc<Mutex<HashSet<String>>>,
 ) -> Result<()> {
     let file_name = file_path.to_str().unwrap().replace("\\", "/");
+    let s3_key = remove_base_path(base_path, file_path);
+    let s3_key = s3_key.to_str().unwrap();
 
+    println!("Uploading path: {} to s3 key: {}", file_name, s3_key);
     let content = tokio::fs::read(file_path).await?;
 
     let content_type = from_path(&file_name).first_or_octet_stream().to_string();
 
     client
         .put_object()
-        .acl(ObjectCannedAcl::PublicRead)
         .bucket(bucket_name)
-        .key(&file_name)
+        .key(s3_key)
         .content_type(content_type)
         .body(content.into())
         .send()
         .await?;
 
     let mut files = uploaded_files.lock().unwrap();
-    files.insert(file_name);
+    files.insert(s3_key.to_string());
 
     Ok(())
 }
