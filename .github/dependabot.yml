@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Enable version updates for Cargo (Rust)
+  - package-ecosystem: "cargo"
+    # Look for `Cargo.toml` and `Cargo.lock` in the `root` directory
+    directory: "/"
+    # Check the `cargo` registry for updates every day (weekdays)
+    schedule:
+      interval: "daily"
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    # Look for `.github/workflows` directory
+    directory: "/.github/workflows"
+    # Check for updates every day (weekdays)
+    schedule:
+      interval: "daily"
