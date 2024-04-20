@@ -1,6 +1,6 @@
 [workspace]
 members = [
     "glow-control-lib",
-    "glow-control",
+    "glow-control", "glow-control-website",
 ]
 resolver = "2"
