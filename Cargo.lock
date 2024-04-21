@@ -837,6 +837,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_filter"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a009aa4810eb158359dda09d0c87378e4bbb89b5a801f016885a4707ba24f7ea"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "env_logger"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -847,6 +857,19 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38b35839ba51819680ba087cd351788c9a3c476841207e0b8cee0b04722343b9"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "env_filter",
+ "humantime",
+ "log",
 ]
 
 [[package]]
@@ -1035,11 +1058,11 @@ checksum = "4271d37baee1b8c7e4b708028c57d816cf9d2434acb33a549475f78c181f6253"
 
 [[package]]
 name = "glow-control"
-version = "0.3.5"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "clap",
- "env_logger",
+ "env_logger 0.10.2",
  "glow-control-lib",
  "serde",
  "serde_json",
@@ -1049,7 +1072,7 @@ dependencies = [
 
 [[package]]
 name = "glow-control-lib"
-version = "0.3.5"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "base64 0.22.0",
@@ -1057,7 +1080,7 @@ dependencies = [
  "chrono",
  "clap",
  "derivative",
- "env_logger",
+ "env_logger 0.11.3",
  "hex",
  "lazy_static",
  "log",
