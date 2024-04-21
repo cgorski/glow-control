@@ -7,8 +7,8 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context};
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use bytes::{BufMut, BytesMut};
 use chrono::{NaiveTime, Timelike};
 use clap::ValueEnum;
@@ -20,7 +20,7 @@ use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
 use tokio::net::UdpSocket;
-use tokio::time::{Instant, interval, sleep};
+use tokio::time::{interval, sleep, Instant};
 use uuid::Uuid;
 
 use crate::util::auth::Auth;
