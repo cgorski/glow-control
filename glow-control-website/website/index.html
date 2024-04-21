@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- simple HTML file with CSS to make a home page for a Rust project called glow-control -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +9,8 @@
             font-family: sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f0f0f0;
+            background-color: #000; /* Black background */
+            color: #c0c0c0; /* Soft grey for regular text */
         }
 
         .container {
@@ -18,6 +18,7 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            flex-direction: column; /* Aligns items vertically */
         }
 
         .content {
@@ -26,12 +27,32 @@
 
         h1 {
             font-size: 3rem;
-            margin: 0;
+            margin: 20px 0; /* Adjusted for better spacing */
+            background: linear-gradient(90deg, #FF0000, #FF7F00, #FFFF00, #00FF00, #0000FF, #4B0082, #9400D3);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent; /* Make the text color transparent to show the gradient */
+            display: inline-block; /* Required for gradient to apply correctly */
+        }
+
+        .subtitle {
+            font-size: 1.2rem; /* Slightly smaller than the paragraph text */
+            color: #a0a0a0; /* A lighter shade of grey for distinction */
+            margin: 10px 0; /* Provides good spacing around the subtitle */
         }
 
         p {
             font-size: 1.5rem;
-            margin: 0;
+            margin: 10px 0; /* Adjusted for better spacing */
+        }
+
+        a {
+            color: #00FFDD; /* Bright teal for links */
+            text-decoration: none; /* Optional: removes underline from links */
+        }
+
+        a:hover, a:active, a:visited {
+            color: #00FFDD; /* Keeps the link color consistent on hover, active, and visited states */
         }
     </style>
 </head>
@@ -39,8 +60,11 @@
 <div class="container">
     <div class="content">
         <h1>glow-control</h1>
+        <p class="subtitle">An unofficial and open source Twinkly controller project in Rust</p>
         <p>Visit the <a href="https://github.com/cgorski/glow-control">GitHub repo</a> or read the <a
-                href="book/index.html">book</a></p>
+                href="https://glowcontrol.rs/book/index.html">book</a></p>
+
     </div>
 </div>
 </body>
+</html>
