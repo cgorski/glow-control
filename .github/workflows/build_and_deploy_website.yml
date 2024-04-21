@@ -30,6 +30,7 @@ jobs:
 
       - name: Copy Book to Website
         run: |
+          ls -al
           cp -r book glow-control-website/website
 
       - name: Change directory to website
