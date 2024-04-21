@@ -30,8 +30,7 @@ jobs:
 
       - name: Copy Book to Website
         run: |
-          cd glow-control-website/book
-          cp -r book glow-control-website/website
+          cp -r glow-control-website/book/book glow-control-website/website
 
       - name: Build and Run Project
         run: |
