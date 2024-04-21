@@ -31,14 +31,7 @@ Rust ecosystem.
 
 ## Library Usage
 
-To include this library in your Rust project, add the following to your `Cargo.toml`:
-
-```toml
-[dependencies]
-glow-control-lib = { version = "0.3.5", path = "../glow-control-lib" }
-```
-
-Here's a simple example of how to use the library to set Twinkly devices to a specific mode:
+A simple example of how to use the library to set Twinkly devices to a specific mode:
 
 ```rust
 use std::collections::HashSet;

@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt;
-use std::io::{BufReader, Read};
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
@@ -359,7 +359,9 @@ impl ControlInterface {
                     RtStdinFormat::Binary => {
                         self.show_real_time_stdin_stream_binary(&mut reader).await?
                     } // RtStdinFormat::Ascii => process_ascii_stream(reader)?,
-                      // RtStdinFormat::JsonLines => process_json_lines_stream(reader)?,
+                    RtStdinFormat::JsonLines => {
+                        self.show_real_time_stdin_stream_jsonl(&mut reader).await?
+                    }
                 };
                 match error_mode {
                     RtStdinErrorMode::IgnoreInvalidAddress => {}
@@ -413,6 +415,21 @@ impl ControlInterface {
             blue,
         };
         let led: AddressableLed = data.into();
+
+        Ok(led)
+    }
+
+    async fn show_real_time_stdin_stream_jsonl(
+        &self,
+        reader: &mut BufReader<impl Read>,
+    ) -> anyhow::Result<AddressableLed> {
+        // Read a line from the input stream
+        let mut line = String::new();
+        reader.read_line(&mut line)?;
+        // Deserialize the JSON line
+        let led: AddressableLedJsonLFormat = serde_json::from_str(&line)?;
+        // Convert the JSON format into the standard format
+        let led: AddressableLed = led.into();
 
         Ok(led)
     }
@@ -1042,8 +1059,15 @@ pub struct Challenge {
     challenge: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RGB {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RgbJsonLFormat {
     pub red: u8,
     pub green: u8,
     pub blue: u8,
@@ -1394,7 +1418,7 @@ async fn send_challenge(
 pub enum RtStdinFormat {
     Binary,
     //  Ascii,
-    //  JsonLines,
+    JsonLines,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -1412,10 +1436,29 @@ pub struct BinaryStreamFormat {
     pub blue: u8,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct AddressableLed {
     pub address: u16,
     pub color: RGB,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct AddressableLedJsonLFormat {
+    pub address: u16,
+    pub color: RgbJsonLFormat,
+}
+
+impl From<AddressableLedJsonLFormat> for AddressableLed {
+    fn from(data: AddressableLedJsonLFormat) -> Self {
+        AddressableLed {
+            address: data.address,
+            color: RGB {
+                red: data.color.red,
+                green: data.color.green,
+                blue: data.color.blue,
+            },
+        }
+    }
 }
 
 impl AddressableLed {
