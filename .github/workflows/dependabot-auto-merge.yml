@@ -11,7 +11,7 @@ jobs:
     if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request_target'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Enable auto-merge for Dependabot PRs
         run: |
           gh pr review ${{ github.event.pull_request.number }} --approve
