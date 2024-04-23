@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 
 use glow_control_lib::control_interface::{
-    CliColors, CliDeviceMode, ControlInterface, RGB, RtStdinErrorMode, RtStdinFormat,
+    CliColors, CliDeviceMode, ControlInterface, RtStdinErrorMode, RtStdinFormat, RGB,
 };
 use glow_control_lib::util::discovery::Discovery;
 
