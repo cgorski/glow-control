@@ -1116,6 +1116,8 @@ dependencies = [
 [[package]]
 name = "glow-effects"
 version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8817a04fef114b753fe3bc866f9eb56a83f295a59b113c814d079973552cfc6"
 dependencies = [
  "nalgebra",
  "rand",
