@@ -7,12 +7,16 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context};
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use bytes::{BufMut, BytesMut};
 use chrono::{NaiveTime, Timelike};
 use clap::ValueEnum;
 use derivative::Derivative;
+use glow_effects::effects::shine::Shine;
+use glow_effects::util::color_point::{ColorPointContainer, RgbPoint};
+use glow_effects::util::effect::Effect;
+use glow_effects::util::point::Point;
 use palette::{FromColor, Hsl, IntoColor, Srgb};
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::thread_rng;
@@ -20,7 +24,7 @@ use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
 use tokio::net::UdpSocket;
-use tokio::time::{interval, sleep, Instant};
+use tokio::time::{Instant, interval, sleep};
 use uuid::Uuid;
 
 use crate::util::auth::Auth;
@@ -232,98 +236,67 @@ impl ControlInterface {
         frame_rate: f64,
         num_start_simultaneous: usize,
     ) -> anyhow::Result<()> {
-        let num_leds = self.device_info.number_of_led;
-
-        // Validate num_start_simultaneous
-        if num_start_simultaneous == 0 || num_start_simultaneous > num_leds {
-            return Err(anyhow!(
-                "num_start_simultaneous must be between 1 and {}",
-                num_leds
-            ));
-        }
-
-        // Validate colors is not empty
-        if colors.is_empty() {
-            return Err(anyhow!("colors set must not be empty"));
-        }
-
-        let mut leds: Vec<(u8, u8, u8)> = vec![(0, 0, 0); num_leds];
-        let mut glow_start_times =
-            vec![Instant::now() - (time_to_max_glow + time_to_fade) * 2; num_leds];
-        let mut led_colors = vec![
-            RGB {
-                red: 0,
-                green: 0,
-                blue: 0,
-            };
-            num_leds
-        ]; // Track color for each LED
-
-        let frame_duration = Duration::from_secs_f64(1.0 / frame_rate);
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.connect((self.host.as_str(), 7777)).await?;
         self.set_mode(DeviceMode::RealTime).await?;
 
-        let mut interval_timer = interval(frame_duration);
-        let mut time_since_last_glow = time_between_glow_start;
-
-        loop {
-            interval_timer.tick().await;
-            let now = Instant::now();
-
-            // Check if it's time to start new glows
-            if time_since_last_glow >= time_between_glow_start {
-                let mut rng = thread_rng();
-                let mut available_leds: Vec<usize> = (0..num_leds)
-                    .filter(|&i| {
-                        now.duration_since(glow_start_times[i]) >= time_to_max_glow + time_to_fade
-                    })
-                    .collect();
-
-                // Shuffle the available LEDs to randomize the selection
-                available_leds.shuffle(&mut rng);
-
-                for &led_index in available_leds.iter().take(num_start_simultaneous) {
-                    glow_start_times[led_index] = now;
-                    // Randomly select a color for the LED
-                    led_colors[led_index] = *colors
-                        .iter()
-                        .choose(&mut rng)
-                        .expect("colors set is not empty");
+        let num_leds = self.device_info.number_of_led;
+        let leds = vec![
+            RgbPoint::new(
+                Point {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                glow_effects::util::color::RGB {
+                    red: 0,
+                    green: 0,
+                    blue: 0,
                 }
+            );
+            num_leds
+        ];
+        // convert colors to glow_effects::util::color::RGB
+        let colors = colors
+            .into_iter()
+            .map(|color| glow_effects::util::color::RGB {
+                red: color.red,
+                green: color.green,
+                blue: color.blue,
+            });
 
-                time_since_last_glow = Duration::from_secs(0);
-            } else {
-                time_since_last_glow += frame_duration;
-            }
+        // colors should be HashSet
+        let colors: HashSet<glow_effects::util::color::RGB> = colors.into_iter().collect();
+        let milliseconds_between_frames = (1.0 / frame_rate * 1000.0) as u128;
+        let frames_between_glow_start =
+            (time_between_glow_start.as_millis() / milliseconds_between_frames) as u32;
+        let frames_to_max_glow =
+            (time_to_max_glow.as_millis() / milliseconds_between_frames) as u32;
+        let frames_to_fade = (time_to_fade.as_millis() / milliseconds_between_frames) as u32;
+        let mut effect = Shine::new(
+            leds,
+            colors,
+            frames_between_glow_start,
+            frames_to_max_glow,
+            frames_to_fade,
+            num_start_simultaneous,
+        )?;
 
-            // Update the state of each LED
-            for i in 0..num_leds {
-                let elapsed = now.duration_since(glow_start_times[i]);
-                let color = led_colors[i];
-
-                // Calculate the brightness based on the elapsed time
-                let brightness = if elapsed < time_to_max_glow {
-                    elapsed.as_secs_f64() / time_to_max_glow.as_secs_f64()
-                } else if elapsed < time_to_max_glow + time_to_fade {
-                    1.0 - (elapsed - time_to_max_glow).as_secs_f64() / time_to_fade.as_secs_f64()
-                } else {
-                    0.0 // LED is off
-                };
-
-                // Set the color with the calculated brightness
-                leds[i] = (
-                    (color.red as f64 * brightness) as u8,
-                    (color.green as f64 * brightness) as u8,
-                    (color.blue as f64 * brightness) as u8,
-                );
-            }
-
-            // Send the updated frame to the device
-            let flattened_frame = ControlInterface::flatten_rgb_vec(leds.clone());
+        for frame in effect.iter() {
+            // convert frame to Vec<(u8, u8, u8)>
+            let frame = frame
+                .iter()
+                .map(|point| {
+                    let color = point.get_color_value();
+                    (color.red, color.green, color.blue)
+                })
+                .collect();
+            let flattened_frame = ControlInterface::flatten_rgb_vec(frame);
             self.set_rt_frame_socket(&socket, &flattened_frame, HardwareVersion::Version3)
                 .await?;
+            sleep(Duration::from_secs_f64(1.0 / frame_rate)).await;
         }
+        Ok(())
     }
 
     pub async fn show_solid_color(&self, rgb: RGB) -> anyhow::Result<()> {
