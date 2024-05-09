@@ -1026,7 +1026,7 @@ pub struct TimerResponse {
     pub code: u32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq, Copy, Clone)]
 pub struct LedCoordinate {
     pub x: f64,
     pub y: f64,
@@ -1034,7 +1034,7 @@ pub struct LedCoordinate {
 }
 
 // Define a struct to deserialize the layout response
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq, Clone)]
 pub struct LayoutResponse {
     pub source: String,
     pub synthesized: bool,
