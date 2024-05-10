@@ -668,6 +668,32 @@ impl ControlInterface {
         }
     }
 
+    /// Helper method to set the device brightness.
+    ///
+    /// # Arguments
+    /// - `brightness`: The brightness value to set.
+    ///                 Range is 0..100.
+    pub async fn set_brightness(&self, brightness: i32) -> anyhow::Result<()> {
+        let url = format!("http://{}/xled/v1/led/out/brightness", self.host);
+        let response = self
+            .client
+            .post(&url)
+            .header("X-Auth-Token", &self.auth_token)
+            .json(&json!({ "mode": "enabled", "type": "A", "value": brightness }))
+            .send()
+            .await
+            .context("Failed to set brightness")?;
+
+        if response.status() == StatusCode::OK {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "Failed to set the brightness with status: {}",
+                response.status()
+            ))
+        }
+    }
+
     async fn authenticate(client: &Client, host: &str, hw_address: &str) -> anyhow::Result<String> {
         // Generate a random challenge
         let challenge = Auth::generate_challenge();
