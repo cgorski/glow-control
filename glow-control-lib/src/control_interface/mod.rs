@@ -101,6 +101,24 @@ pub enum DeviceMode {
     Off,
 }
 
+/// Brightness response when getting brightness.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BrightnessResponse {
+    /// Something like `1000`.
+    pub code: i32,
+    /// Either "enabled" or "disabled".
+    pub mode: String,
+    /// Range inside 0..100.
+    pub value: i32,
+}
+
+impl BrightnessResponse {
+    /// If the mode signals that the devices is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.mode == "enabled"
+    }
+}
+
 impl std::str::FromStr for DeviceMode {
     type Err = anyhow::Error;
 
@@ -737,6 +755,30 @@ impl ControlInterface {
             }
             _ => Err(anyhow::anyhow!(
                 "Failed to get mode with status: {}",
+                response.status()
+            )),
+        }
+    }
+
+    pub async fn get_brightness(&self) -> anyhow::Result<BrightnessResponse> {
+        let url = format!("http://{}/xled/v1/led/out/brightness", self.host);
+        let response = self
+            .client
+            .get(&url)
+            .header("X-Auth-Token", &self.auth_token)
+            .send()
+            .await
+            .context("Failed to get brightness")?;
+
+        match response.status() {
+            StatusCode::OK => {
+                let mode_response = response.json::<BrightnessResponse>().await?;
+                println!("Brightness response: {:#?}", mode_response);
+                println!("Brightness: {}", mode_response.value);
+                Ok(mode_response)
+            }
+            _ => Err(anyhow::anyhow!(
+                "Failed to get brightness with status: {}",
                 response.status()
             )),
         }
