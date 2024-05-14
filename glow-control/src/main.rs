@@ -211,7 +211,7 @@ async fn handle_cli(cli: Cli) -> Result<()> {
             }
         }
         Commands::DeviceCall { ip, mac, action } => {
-            let high_control_interface = ControlInterface::new(&ip, &mac).await?;
+            let high_control_interface = ControlInterface::new(&ip, &mac, None).await?;
 
             match action {
                 DeviceAction::GetMode => {

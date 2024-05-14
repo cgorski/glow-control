@@ -5,10 +5,12 @@ use std::net::Ipv4Addr;
 use std::time::Duration;
 
 use anyhow::Context;
-use log::info;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
 use tokio::time::{timeout, Instant};
+
+use derivative::Derivative;
 
 use crate::control_interface::ControlInterface;
 
@@ -43,13 +45,26 @@ impl DiscoveryResponse {
     }
 }
 
-#[derive(Debug, Hash, Eq, PartialEq, PartialOrd, Clone, Serialize)]
+#[derive(Derivative)]
+#[derivative(Hash, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DeviceIdentifier {
     pub ip_address: Ipv4Addr,
     pub device_id: String,
     pub mac_address: String,
     pub device_name: String,
     pub led_count: u16,
+
+    /**
+    The auth-token if the device was authenticated.
+
+    If the device was found by a search, the auth_token must
+    be generated to pull info from the device, and then that new token must be used.
+
+    **Too frequent token generation _can_ lead to erroneous behavior.**
+    */
+    #[derivative(Hash = "ignore", PartialEq = "ignore", PartialOrd = "ignore")]
+    pub auth_token: Option<String>,
 }
 
 impl DeviceIdentifier {
@@ -59,6 +74,7 @@ impl DeviceIdentifier {
         mac_address: String,
         device_name: String,
         led_count: u16,
+        auth_token: Option<String>,
     ) -> Self {
         DeviceIdentifier {
             ip_address,
@@ -66,11 +82,30 @@ impl DeviceIdentifier {
             mac_address,
             device_name,
             led_count,
+            auth_token,
         }
     }
 }
 
 pub struct Discovery;
+
+/**
+The response from the discovery request.
+
+It includes the newly found devices, and the existing devices
+(if the `existing_devices` argument has been supplied to
+[`Discovery::find_new_devices`]).
+*/
+pub struct ResponseNewExisting {
+    /// Newly found devices.
+    pub new_devices: HashSet<DeviceIdentifier>,
+    
+    /**
+    Existing devices, which have been re-discovered.
+    Used by [`Self::find_new_devices`] if the `existing_devices` argument  has been supplied.
+     */
+    pub existing_devices: HashSet<DeviceIdentifier>,
+}
 
 impl Discovery {
     pub fn decode_discovery_response(data: &[u8]) -> Option<DiscoveryResponse> {
@@ -101,17 +136,31 @@ impl Discovery {
         })
     }
 
-    pub async fn find_devices(
+    pub async fn find_devices(given_timeout: Duration) -> anyhow::Result<HashSet<DeviceIdentifier>> {
+        Self::find_new_devices(given_timeout, None).await
+            .map(|devices: ResponseNewExisting| devices.new_devices)
+    }
+
+    /**
+    Finds new devices on the network.
+
+    Skips devices which are already in `existing_devices` and reports them in [`ResponseNewExisting::existing_devices`].
+    Newly found devices are reported in [`ResponseNewExisting::new_devices`].
+     */
+    pub async fn find_new_devices(
         given_timeout: Duration,
-    ) -> anyhow::Result<HashSet<DeviceIdentifier>> {
+        existing_devices: Option<HashSet<DeviceIdentifier>>
+    ) -> anyhow::Result<ResponseNewExisting> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.set_broadcast(true)?;
         socket.send_to(PING_MESSAGE, BROADCAST_ADDRESS).await?;
 
-        let mut discovered_devices = HashSet::new();
+        let mut discovered_devices = HashSet::<DeviceIdentifier>::new();
         let mut buffer = [0; 1024];
 
         let timeout_end = Instant::now() + given_timeout;
+
+        let mut found_existing_devices = HashSet::<DeviceIdentifier>::new();
 
         loop {
             if Instant::now() >= timeout_end {
@@ -126,6 +175,28 @@ impl Discovery {
                     let received_data = &buffer[..number_of_bytes];
                     if let Some(discovery_response) = Self::decode_discovery_response(received_data)
                     {
+                        /*
+                         Look first if the device (i.e. address) is already in `discovered_devices`,
+                         and skip it, if it is, that makes the discovery process faster.
+
+                         It also saves the needless re-authentication of the device, which saves additional time.
+
+                         Cause: Some devices may respond multiple times for one request, to make sure the listener
+                                gets it.
+                         */
+                        // Search if `discovered_devices` matches a `discovery_response`:
+                        if Self::find_discovered_device(&discovered_devices, &discovery_response).is_some() {
+                            info!("Found device {:?} again, skipping", discovery_response);
+                            continue;
+                        }
+                        // Search if `existing_devices` matches a `discovery_response`:
+                        if let Some(existing_devices) = &existing_devices {
+                            if let Some(exist) = Self::find_discovered_device(&existing_devices, &discovery_response) {
+                                found_existing_devices.insert(exist);
+                                info!("Device {:?} isn't new, skipping", discovery_response);
+                                continue;
+                            }
+                        }
                         info!("Found device: {:?}", discovery_response);
                         match Self::fetch_gestalt_info(discovery_response.ip_address).await {
                             Ok(gestalt_info) => {
@@ -134,6 +205,7 @@ impl Discovery {
                                 let high_control_interface = ControlInterface::new(
                                     &discovery_response.ip_address.to_string(),
                                     &gestalt_info.mac,
+                                    None,
                                 )
                                 .await?;
                                 let led_count =
@@ -144,6 +216,8 @@ impl Discovery {
                                     gestalt_info.mac,
                                     gestalt_info.device_name,
                                     led_count,
+                                    // Reuse the auth token from the high control interface to speed up authentication.
+                                    Some(high_control_interface.auth_token),
                                 );
                                 discovered_devices.insert(device);
                             }
@@ -162,8 +236,26 @@ impl Discovery {
             }
         }
 
-        Ok(discovered_devices)
+        Ok(ResponseNewExisting { new_devices: discovered_devices, existing_devices: found_existing_devices })
     }
+
+    /// Returns if `discovery_response` is in the Set of `devices`.
+    fn find_discovered_device(devices: &HashSet<DeviceIdentifier>, discovery_response: &DiscoveryResponse) -> Option<DeviceIdentifier> {
+        let filtered: Vec<DeviceIdentifier> = devices.iter().filter(|device_identifier: &&DeviceIdentifier| {
+            device_identifier.device_id == discovery_response.device_id
+                && device_identifier.ip_address == discovery_response.ip_address
+        }).cloned().collect();
+        match filtered.len() {
+            0 => None,
+            1 => filtered.first().cloned(),
+            _ => {
+                error!("Found multiple devices with the same IP address {} and device ID {}",
+                    discovery_response.ip_address, discovery_response.device_id);
+                None
+            },
+        }
+    }
+
     async fn fetch_gestalt_info(ip_address: Ipv4Addr) -> anyhow::Result<GestaltResponse> {
         let url = format!("http://{}/xled/v1/gestalt", ip_address);
         let client = reqwest::Client::new();

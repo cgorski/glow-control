@@ -42,7 +42,7 @@ pub enum HardwareVersion {
 pub struct ControlInterface {
     pub host: String,
     hw_address: String,
-    auth_token: String,
+    pub(crate) auth_token: String,
     client: Client,
     device_info: DeviceInfoResponse,
 }
@@ -152,9 +152,14 @@ impl fmt::Display for DeviceMode {
 }
 
 impl ControlInterface {
-    pub async fn new(host: &str, hw_address: &str) -> anyhow::Result<Self> {
+    pub async fn new(host: &str, hw_address: &str, existing_auth_token: Option<String>) -> anyhow::Result<Self> {
         let client = Client::new();
-        let auth_token = ControlInterface::authenticate(&client, host, hw_address).await?;
+
+        let auth_token: String = if let Some(given_auth_token) = existing_auth_token {
+            given_auth_token
+        } else {
+            ControlInterface::authenticate(&client, host, hw_address).await?
+        };
 
         // Fetch the device information
         let device_info = ControlInterface::fetch_device_info(&client, host, &auth_token).await?;
@@ -175,6 +180,14 @@ impl ControlInterface {
         } else {
             false
         }
+    }
+
+    /**
+    Updates the authentication token, after a device re-authenticated.
+     */
+    pub fn with_auth_token(mut self, auth_token: String) -> Self {
+        self.auth_token = auth_token;
+        self
     }
 
     /**
@@ -246,6 +259,7 @@ impl ControlInterface {
         ControlInterface::new(
             device_identifier.ip_address.to_string().as_str(),
             device_identifier.mac_address.to_string().as_str(),
+            device_identifier.auth_token,
         )
         .await
     }
@@ -659,7 +673,7 @@ impl ControlInterface {
     }
 
     /// Turns off the device and remembers the last non-real-time mode.
-    pub async fn turn_off(&mut self) -> anyhow::Result<()> {
+    pub async fn turn_off(&self) -> anyhow::Result<()> {
         // Set the device mode to "off"
         self.set_mode(DeviceMode::Off).await
     }
@@ -1357,6 +1371,8 @@ struct ChallengeResponse {
     #[serde(rename = "challenge-response")]
     challenge_response: String,
     authentication_token: String,
+    /// Seems to be always 1440. Since a Day has 1440 Minutes, this may mean: "10 Days"?
+    authentication_token_expires_in: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
