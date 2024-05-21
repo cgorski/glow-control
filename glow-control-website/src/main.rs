@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
     let bucket_name = &args[2];
 
     // Load SDK config from environment
-    let config = aws_config::load_defaults(BehaviorVersion::v2023_11_09()).await;
+    let config = aws_config::load_defaults(BehaviorVersion::v2024_03_28()).await;
     let client = s3::Client::new(&config);
 
     // List all objects in the bucket before uploading
