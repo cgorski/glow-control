@@ -99,7 +99,7 @@ It includes the newly found devices, and the existing devices
 pub struct ResponseNewExisting {
     /// Newly found devices.
     pub new_devices: HashSet<DeviceIdentifier>,
-    
+
     /**
     Existing devices, which have been re-discovered.
     Used by [`Self::find_new_devices`] if the `existing_devices` argument  has been supplied.
@@ -136,8 +136,11 @@ impl Discovery {
         })
     }
 
-    pub async fn find_devices(given_timeout: Duration) -> anyhow::Result<HashSet<DeviceIdentifier>> {
-        Self::find_new_devices(given_timeout, None).await
+    pub async fn find_devices(
+        given_timeout: Duration,
+    ) -> anyhow::Result<HashSet<DeviceIdentifier>> {
+        Self::find_new_devices(given_timeout, None)
+            .await
             .map(|devices: ResponseNewExisting| devices.new_devices)
     }
 
@@ -149,7 +152,7 @@ impl Discovery {
      */
     pub async fn find_new_devices(
         given_timeout: Duration,
-        existing_devices: Option<HashSet<DeviceIdentifier>>
+        existing_devices: Option<HashSet<DeviceIdentifier>>,
     ) -> anyhow::Result<ResponseNewExisting> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.set_broadcast(true)?;
@@ -176,22 +179,26 @@ impl Discovery {
                     if let Some(discovery_response) = Self::decode_discovery_response(received_data)
                     {
                         /*
-                         Look first if the device (i.e. address) is already in `discovered_devices`,
-                         and skip it, if it is, that makes the discovery process faster.
+                        Look first if the device (i.e. address) is already in `discovered_devices`,
+                        and skip it, if it is, that makes the discovery process faster.
 
-                         It also saves the needless re-authentication of the device, which saves additional time.
+                        It also saves the needless re-authentication of the device, which saves additional time.
 
-                         Cause: Some devices may respond multiple times for one request, to make sure the listener
-                                gets it.
-                         */
+                        Cause: Some devices may respond multiple times for one request, to make sure the listener
+                               gets it.
+                        */
                         // Search if `discovered_devices` matches a `discovery_response`:
-                        if Self::find_discovered_device(&discovered_devices, &discovery_response).is_some() {
+                        if Self::find_discovered_device(&discovered_devices, &discovery_response)
+                            .is_some()
+                        {
                             info!("Found device {:?} again, skipping", discovery_response);
                             continue;
                         }
                         // Search if `existing_devices` matches a `discovery_response`:
                         if let Some(existing_devices) = &existing_devices {
-                            if let Some(exist) = Self::find_discovered_device(&existing_devices, &discovery_response) {
+                            if let Some(exist) =
+                                Self::find_discovered_device(&existing_devices, &discovery_response)
+                            {
                                 found_existing_devices.insert(exist);
                                 info!("Device {:?} isn't new, skipping", discovery_response);
                                 continue;
@@ -236,23 +243,35 @@ impl Discovery {
             }
         }
 
-        Ok(ResponseNewExisting { new_devices: discovered_devices, existing_devices: found_existing_devices })
+        Ok(ResponseNewExisting {
+            new_devices: discovered_devices,
+            existing_devices: found_existing_devices,
+        })
     }
 
     /// Returns if `discovery_response` is in the Set of `devices`.
-    fn find_discovered_device(devices: &HashSet<DeviceIdentifier>, discovery_response: &DiscoveryResponse) -> Option<DeviceIdentifier> {
-        let filtered: Vec<DeviceIdentifier> = devices.iter().filter(|device_identifier: &&DeviceIdentifier| {
-            device_identifier.device_id == discovery_response.device_id
-                && device_identifier.ip_address == discovery_response.ip_address
-        }).cloned().collect();
+    fn find_discovered_device(
+        devices: &HashSet<DeviceIdentifier>,
+        discovery_response: &DiscoveryResponse,
+    ) -> Option<DeviceIdentifier> {
+        let filtered: Vec<DeviceIdentifier> = devices
+            .iter()
+            .filter(|device_identifier: &&DeviceIdentifier| {
+                device_identifier.device_id == discovery_response.device_id
+                    && device_identifier.ip_address == discovery_response.ip_address
+            })
+            .cloned()
+            .collect();
         match filtered.len() {
             0 => None,
             1 => filtered.first().cloned(),
             _ => {
-                error!("Found multiple devices with the same IP address {} and device ID {}",
-                    discovery_response.ip_address, discovery_response.device_id);
+                error!(
+                    "Found multiple devices with the same IP address {} and device ID {}",
+                    discovery_response.ip_address, discovery_response.device_id
+                );
                 None
-            },
+            }
         }
     }
 

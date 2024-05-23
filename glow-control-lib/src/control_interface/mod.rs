@@ -152,7 +152,11 @@ impl fmt::Display for DeviceMode {
 }
 
 impl ControlInterface {
-    pub async fn new(host: &str, hw_address: &str, existing_auth_token: Option<String>) -> anyhow::Result<Self> {
+    pub async fn new(
+        host: &str,
+        hw_address: &str,
+        existing_auth_token: Option<String>,
+    ) -> anyhow::Result<Self> {
         let client = Client::new();
 
         let auth_token: String = if let Some(given_auth_token) = existing_auth_token {
@@ -174,7 +178,9 @@ impl ControlInterface {
     }
 
     pub async fn reauthenticate(&mut self) -> bool {
-        if let Ok(result) = ControlInterface::authenticate(&self.client, &self.host, &self.hw_address).await {
+        if let Ok(result) =
+            ControlInterface::authenticate(&self.client, &self.host, &self.hw_address).await
+        {
             self.auth_token = result;
             true
         } else {
