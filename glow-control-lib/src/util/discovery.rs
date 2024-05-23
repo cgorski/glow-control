@@ -197,7 +197,7 @@ impl Discovery {
                         // Search if `existing_devices` matches a `discovery_response`:
                         if let Some(existing_devices) = &existing_devices {
                             if let Some(exist) =
-                                Self::find_discovered_device(&existing_devices, &discovery_response)
+                                Self::find_discovered_device(existing_devices, &discovery_response)
                             {
                                 found_existing_devices.insert(exist);
                                 info!("Device {:?} isn't new, skipping", discovery_response);

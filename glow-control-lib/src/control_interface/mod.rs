@@ -551,7 +551,7 @@ impl ControlInterface {
         }
 
         // Send the packet for versions 1 and 2
-        return socket.send(&packet).await.map_err(|err| anyhow!(err));
+        socket.send(&packet).await.map_err(|err| anyhow!(err))
     }
     pub async fn show_rt_frame(&self, frame: &[u8]) -> anyhow::Result<()> {
         // Fetch the current mode from the device
