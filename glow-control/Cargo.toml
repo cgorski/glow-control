@@ -16,7 +16,7 @@ categories = ["hardware-support", "api-bindings", "command-line-utilities"]
 [dependencies]
 anyhow = "1.0"
 tokio = { version = "1.38", features = ["full"] }
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 env_logger = "0.11"
 glow-control-lib = { version = "0.5.0", path = "../glow-control-lib" }
 serde = { version = "1.0", features = ["derive"] }
