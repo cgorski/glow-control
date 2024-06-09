@@ -584,7 +584,8 @@ impl ControlInterface {
         socket.connect((self.host.as_str(), 7777)).await?;
         // Call the set_rt_frame_socket method to send the frame
         self.set_rt_frame_socket(&socket, frame, HardwareVersion::Version3)
-            .await.map_err(|err| anyhow!(err))
+            .await
+            .map_err(|err| anyhow!(err))
     }
 
     pub fn get_device_info(&self) -> &DeviceInfoResponse {
@@ -685,7 +686,9 @@ impl ControlInterface {
 
         // If the device is already on, we don't need to change the mode
         if current_mode != DeviceMode::Off {
-            return Ok(VerifyResponse { code: traits::OK.code });
+            return Ok(VerifyResponse {
+                code: traits::OK.code,
+            });
         }
 
         // If the device is off, set it to a default mode
