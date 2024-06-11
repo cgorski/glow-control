@@ -17,6 +17,7 @@ use glow_effects::effects::shine::Shine;
 use glow_effects::util::color_point::{ColorPointContainer, RgbPoint};
 use glow_effects::util::effect::Effect;
 use glow_effects::util::point::Point;
+use log::debug;
 use palette::{FromColor, Hsl, IntoColor, Srgb};
 
 use reqwest::{Client, StatusCode};
@@ -29,6 +30,8 @@ use uuid::Uuid;
 use crate::util::auth::Auth;
 use crate::util::discovery::DeviceIdentifier;
 use crate::util::movie::Movie;
+use crate::util::traits;
+use crate::util::traits::{ResponseCode, ResponseCodeTrait};
 
 /// Twinkly hardware version.
 pub enum HardwareVersion {
@@ -37,11 +40,11 @@ pub enum HardwareVersion {
     Version3,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ControlInterface {
     pub host: String,
     hw_address: String,
-    auth_token: String,
+    pub(crate) auth_token: String,
     client: Client,
     device_info: DeviceInfoResponse,
 }
@@ -100,7 +103,31 @@ pub enum DeviceMode {
     Off,
 }
 
-impl std::str::FromStr for DeviceMode {
+/// Brightness response when getting brightness.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BrightnessResponse {
+    /// Something like `1000`.
+    pub code: u32,
+    /// Either "enabled" or "disabled".
+    pub mode: String,
+    /// Range inside 0..100.
+    pub value: i32,
+}
+
+impl BrightnessResponse {
+    /// If the mode signals that the devices is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.mode == "enabled"
+    }
+}
+
+impl ResponseCodeTrait for BrightnessResponse {
+    fn response_code(&self) -> ResponseCode {
+        Self::map_response_code(self.code)
+    }
+}
+
+impl FromStr for DeviceMode {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -133,9 +160,18 @@ impl fmt::Display for DeviceMode {
 }
 
 impl ControlInterface {
-    pub async fn new(host: &str, hw_address: &str) -> anyhow::Result<Self> {
+    pub async fn new(
+        host: &str,
+        hw_address: &str,
+        existing_auth_token: Option<String>,
+    ) -> anyhow::Result<Self> {
         let client = Client::new();
-        let auth_token = ControlInterface::authenticate(&client, host, hw_address).await?;
+
+        let auth_token: String = if let Some(given_auth_token) = existing_auth_token {
+            given_auth_token
+        } else {
+            ControlInterface::authenticate(&client, host, hw_address).await?
+        };
 
         // Fetch the device information
         let device_info = ControlInterface::fetch_device_info(&client, host, &auth_token).await?;
@@ -147,6 +183,25 @@ impl ControlInterface {
             client,
             device_info,
         })
+    }
+
+    pub async fn reauthenticate(&mut self) -> bool {
+        if let Ok(result) =
+            ControlInterface::authenticate(&self.client, &self.host, &self.hw_address).await
+        {
+            self.auth_token = result;
+            true
+        } else {
+            false
+        }
+    }
+
+    /**
+    Updates the authentication token, after a device re-authenticated.
+     */
+    pub fn with_auth_token(mut self, auth_token: String) -> Self {
+        self.auth_token = auth_token;
+        self
     }
 
     /**
@@ -185,7 +240,7 @@ impl ControlInterface {
             max_movies: 55,
             wire_type: 0,
             copyright: "Fake Copyright".to_string(),
-            code: 1000,
+            code: crate::util::traits::OK.code as usize,
         }
     }
 
@@ -218,6 +273,7 @@ impl ControlInterface {
         ControlInterface::new(
             device_identifier.ip_address.to_string().as_str(),
             device_identifier.mac_address.to_string().as_str(),
+            device_identifier.auth_token,
         )
         .await
     }
@@ -416,7 +472,7 @@ impl ControlInterface {
         self.set_mode(DeviceMode::RealTime).await?;
         let layout = self.fetch_layout().await?;
         loop {
-            //   let gradient_frame = generate_color_wheel_gradient(self.device_info.number_of_led, offset);
+            // let gradient_frame = generate_color_wheel_gradient(self.device_info.number_of_led, offset as usize);
             let gradient_frame =
                 generate_color_gradient_along_axis(&layout.coordinates, Axis::Z, offset);
             let gradient_frame = ControlInterface::flatten_rgb_vec(gradient_frame);
@@ -442,12 +498,18 @@ impl ControlInterface {
             .collect()
     }
 
+    /**
+    Set realtime frame with a provided socket.
+
+    # Return
+    Returns either the written bytes or an error.
+     */
     pub async fn set_rt_frame_socket(
         &self,
         socket: &UdpSocket,
         frame: &[u8],
         version: HardwareVersion,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<usize> {
         // Determine the protocol version from the device configuration
         // let version = self.device_info.fw_version; // Assuming fw_version is a field in DeviceInfoResponse
 
@@ -474,6 +536,7 @@ impl ControlInterface {
             _ => {
                 // Protocol version 3 or higher
                 let packet_size = 900;
+                let mut written_bytes = 0;
                 for (i, chunk) in frame.chunks(packet_size).enumerate() {
                     packet.clear();
                     packet.put_u8(3); // Protocol version 3
@@ -481,18 +544,33 @@ impl ControlInterface {
                     packet.put_u16(0); // Placeholder bytes
                     packet.put_u8(i as u8); // Frame index
                     packet.extend_from_slice(chunk);
-                    socket.send(&packet).await?;
+                    let send_result: std::io::Result<usize> = socket.send(&packet).await;
+
+                    if let Ok(send_result) = send_result {
+                        written_bytes += send_result;
+                    } else if let Some(err) = send_result.err() {
+                        let err_string = format!("Failed to send frame {}: {:?}", i, err);
+                        debug!("{}", err_string);
+                        return Err(anyhow!(err_string));
+                    }
                 }
-                return Ok(()); // Early return for version 3
+                return Ok(written_bytes); // Early return for version 3
             }
         }
 
         // Send the packet for versions 1 and 2
-        socket.send(&packet).await?;
-
-        Ok(())
+        socket.send(&packet).await.map_err(|err| anyhow!(err))
     }
-    pub async fn show_rt_frame(&self, frame: &[u8]) -> anyhow::Result<()> {
+
+    /**
+    Ensures the mode is [`DeviceMode::RealTime`], creates a UDP socket, connect it and send a frame to it.
+    For a continuous animation, without constant socket recreation and rebinding,
+    use [`Self::set_rt_frame_socket`] instead.
+
+    # Return
+    Returns either the written bytes or an error.
+     */
+    pub async fn show_rt_frame(&self, frame: &[u8]) -> anyhow::Result<usize> {
         // Fetch the current mode from the device
         let mode_response = self.get_mode().await?;
         let current_mode = mode_response;
@@ -506,9 +584,8 @@ impl ControlInterface {
         socket.connect((self.host.as_str(), 7777)).await?;
         // Call the set_rt_frame_socket method to send the frame
         self.set_rt_frame_socket(&socket, frame, HardwareVersion::Version3)
-            .await?;
-
-        Ok(())
+            .await
+            .map_err(|err| anyhow!(err))
     }
 
     pub fn get_device_info(&self) -> &DeviceInfoResponse {
@@ -602,14 +679,16 @@ impl ControlInterface {
     }
 
     /// Turns on the device by setting it to the last known mode or a default mode.
-    pub async fn turn_on(&self) -> anyhow::Result<()> {
+    pub async fn turn_on(&self) -> anyhow::Result<VerifyResponse> {
         // Fetch the current mode from the device
-        let mode_response = self.get_mode().await?;
+        let mode_response: DeviceMode = self.get_mode().await?;
         let current_mode = mode_response;
 
         // If the device is already on, we don't need to change the mode
         if current_mode != DeviceMode::Off {
-            return Ok(());
+            return Ok(VerifyResponse {
+                code: traits::OK.code,
+            });
         }
 
         // If the device is off, set it to a default mode
@@ -618,13 +697,13 @@ impl ControlInterface {
     }
 
     /// Turns off the device and remembers the last non-real-time mode.
-    pub async fn turn_off(&mut self) -> anyhow::Result<()> {
+    pub async fn turn_off(&self) -> anyhow::Result<VerifyResponse> {
         // Set the device mode to "off"
         self.set_mode(DeviceMode::Off).await
     }
 
     /// Helper method to set the device mode.
-    pub async fn set_mode(&self, mode: DeviceMode) -> anyhow::Result<()> {
+    pub async fn set_mode(&self, mode: DeviceMode) -> anyhow::Result<VerifyResponse> {
         let url = format!("http://{}/xled/v1/led/mode", self.host);
         let response = self
             .client
@@ -636,10 +715,37 @@ impl ControlInterface {
             .context("Failed to set mode")?;
 
         if response.status() == StatusCode::OK {
-            Ok(())
+            let mode_response = response.json::<VerifyResponse>().await?;
+            Ok(mode_response)
         } else {
             Err(anyhow::anyhow!(
                 "Failed to set mode with status: {}",
+                response.status()
+            ))
+        }
+    }
+
+    /// Helper method to set the device brightness.
+    ///
+    /// # Arguments
+    /// - `brightness`: The brightness value to set.
+    ///                 Range is 0..100.
+    pub async fn set_brightness(&self, brightness: i32) -> anyhow::Result<()> {
+        let url = format!("http://{}/xled/v1/led/out/brightness", self.host);
+        let response = self
+            .client
+            .post(&url)
+            .header("X-Auth-Token", &self.auth_token)
+            .json(&json!({ "mode": "enabled", "type": "A", "value": brightness }))
+            .send()
+            .await
+            .context("Failed to set brightness")?;
+
+        if response.status() == StatusCode::OK {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "Failed to set the brightness with status: {}",
                 response.status()
             ))
         }
@@ -688,6 +794,30 @@ impl ControlInterface {
             }
             _ => Err(anyhow::anyhow!(
                 "Failed to get mode with status: {}",
+                response.status()
+            )),
+        }
+    }
+
+    pub async fn get_brightness(&self) -> anyhow::Result<BrightnessResponse> {
+        let url = format!("http://{}/xled/v1/led/out/brightness", self.host);
+        let response = self
+            .client
+            .get(&url)
+            .header("X-Auth-Token", &self.auth_token)
+            .send()
+            .await
+            .context("Failed to get brightness")?;
+
+        match response.status() {
+            StatusCode::OK => {
+                let mode_response = response.json::<BrightnessResponse>().await?;
+                println!("Brightness response: {:#?}", mode_response);
+                println!("Brightness: {}", mode_response.value);
+                Ok(mode_response)
+            }
+            _ => Err(anyhow::anyhow!(
+                "Failed to get brightness with status: {}",
                 response.status()
             )),
         }
@@ -953,6 +1083,12 @@ impl PartialOrd for DeviceInfoResponse {
     }
 }
 
+impl ResponseCodeTrait for DeviceInfoResponse {
+    fn response_code(&self) -> ResponseCode {
+        Self::map_response_code(self.code as u32)
+    }
+}
+
 fn deserialize_duration_millis<'de, D>(deserializer: D) -> anyhow::Result<Duration, D::Error>
 where
     D: Deserializer<'de>,
@@ -989,10 +1125,22 @@ pub struct PlaylistResponse {
     pub code: u32,
 }
 
+impl ResponseCodeTrait for PlaylistResponse {
+    fn response_code(&self) -> ResponseCode {
+        Self::map_response_code(self.code)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ModeResponse {
     pub mode: String,
     pub code: u32,
+}
+
+impl ResponseCodeTrait for ModeResponse {
+    fn response_code(&self) -> ResponseCode {
+        Self::map_response_code(self.code)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1003,7 +1151,13 @@ pub struct TimerResponse {
     pub code: u32,
 }
 
-#[derive(Deserialize, Debug)]
+impl ResponseCodeTrait for TimerResponse {
+    fn response_code(&self) -> ResponseCode {
+        Self::map_response_code(self.code)
+    }
+}
+
+#[derive(Deserialize, Debug, PartialEq, Copy, Clone)]
 pub struct LedCoordinate {
     pub x: f64,
     pub y: f64,
@@ -1011,13 +1165,19 @@ pub struct LedCoordinate {
 }
 
 // Define a struct to deserialize the layout response
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, PartialEq, Clone)]
 pub struct LayoutResponse {
     pub source: String,
     pub synthesized: bool,
     pub uuid: String,
     pub coordinates: Vec<LedCoordinate>,
     pub code: u32,
+}
+
+impl ResponseCodeTrait for LayoutResponse {
+    fn response_code(&self) -> ResponseCode {
+        Self::map_response_code(self.code)
+    }
 }
 
 pub enum Axis {
@@ -1231,7 +1391,7 @@ async fn send_verify(
                 .json::<VerifyResponse>()
                 .await
                 .context("Failed to deserialize verify response")?;
-            if verify_response.code == 1000 {
+            if verify_response.response_code().is_ok() {
                 //   println!("Verify response code is 1000");
                 Ok(())
             } else {
@@ -1256,9 +1416,22 @@ struct LoginResponse {
     code: u32,
 }
 
+impl ResponseCodeTrait for LoginResponse {
+    fn response_code(&self) -> ResponseCode {
+        Self::map_response_code(self.code)
+    }
+}
+
+/// The response code in the response JSON, returned additionally to the returned HTTP Status code.
 #[derive(Serialize, Deserialize, Debug)]
-struct VerifyResponse {
+pub struct VerifyResponse {
     code: u32,
+}
+
+impl ResponseCodeTrait for VerifyResponse {
+    fn response_code(&self) -> ResponseCode {
+        Self::map_response_code(self.code)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1266,6 +1439,8 @@ struct ChallengeResponse {
     #[serde(rename = "challenge-response")]
     challenge_response: String,
     authentication_token: String,
+    /// Seems to be always 1440. Since a Day has 1440 Minutes, this may mean: "10 Days"?
+    authentication_token_expires_in: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
