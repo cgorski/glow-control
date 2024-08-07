@@ -29,7 +29,7 @@ hex = "0.4"
 lazy_static = "1.5"
 rand_distr = "0.4"
 chrono = "0.4"
-bytes = "1.6"
+bytes = "1.7"
 palette = "0.7"
 derivative = "2.2"
 uuid = { version = "1.10", features = ["v4"] }
