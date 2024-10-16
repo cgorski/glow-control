@@ -32,6 +32,6 @@ chrono = "0.4"
 bytes = "1.7"
 palette = "0.7"
 derivative = "2.2"
-uuid = { version = "1.10", features = ["v4"] }
+uuid = { version = "1.11", features = ["v4"] }
 glow-effects = { version = "0.5.0" }
 
